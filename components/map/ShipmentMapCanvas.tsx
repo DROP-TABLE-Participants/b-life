@@ -1,0 +1,204 @@
+"use client";
+
+import mapboxgl, { type GeoJSONSource } from "mapbox-gl";
+import { useEffect, useMemo, useRef } from "react";
+import type { Feature, FeatureCollection, LineString } from "geojson";
+import type { Forecast, Hospital, Shipment } from "@/types/domain";
+
+interface ShipmentMapCanvasProps {
+  hospitals: Hospital[];
+  shipments: Shipment[];
+  forecasts: Forecast[];
+  highlightedHospitalId?: string;
+}
+
+const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+
+const shipmentColor: Record<Shipment["status"], string> = {
+  planned: "#94a3b8",
+  approved: "#38bdf8",
+  in_transit: "#22d3ee",
+  delayed: "#f59e0b",
+  delivered: "#10b981",
+  cancelled: "#fb7185",
+};
+
+const ensureMapboxToken = () => {
+  if (!mapboxgl.accessToken) {
+    mapboxgl.accessToken = "no-token-required-for-external-style";
+  }
+};
+
+const makeRouteGeoJson = (hospitals: Hospital[], shipments: Shipment[]): FeatureCollection<LineString> => {
+  const byId = Object.fromEntries(hospitals.map((hospital) => [hospital.id, hospital]));
+
+  const features = shipments.reduce<Array<Feature<LineString>>>((acc, shipment) => {
+    const from = byId[shipment.fromHospitalId];
+    const to = byId[shipment.toHospitalId];
+    if (!from || !to) return acc;
+
+    acc.push({
+      type: "Feature",
+      geometry: {
+        type: "LineString",
+        coordinates: [from.coordinates, to.coordinates],
+      },
+      properties: {
+        id: shipment.id,
+        status: shipment.status,
+      },
+    });
+
+    return acc;
+  }, []);
+
+  return {
+    type: "FeatureCollection",
+    features,
+  };
+};
+
+export function ShipmentMapCanvas({ hospitals, shipments, forecasts, highlightedHospitalId }: ShipmentMapCanvasProps) {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const hospitalMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const shipmentMarkersRef = useRef<mapboxgl.Marker[]>([]);
+
+  const bounds = useMemo(() => {
+    const mapBounds = new mapboxgl.LngLatBounds();
+    hospitals.forEach((hospital) => mapBounds.extend(hospital.coordinates));
+    return mapBounds;
+  }, [hospitals]);
+
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    ensureMapboxToken();
+
+    const map = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: MAP_STYLE,
+      center: [-84.8, 34.6],
+      zoom: 5.1,
+      pitch: 36,
+      bearing: -9,
+      interactive: true,
+      attributionControl: false,
+    });
+
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+
+    map.on("load", () => {
+      map.addSource("shipment-routes", {
+        type: "geojson",
+        data: makeRouteGeoJson(hospitals, shipments),
+      });
+
+      map.addLayer({
+        id: "shipment-routes",
+        type: "line",
+        source: "shipment-routes",
+        paint: {
+          "line-color": [
+            "match",
+            ["get", "status"],
+            "in_transit",
+            shipmentColor.in_transit,
+            "delayed",
+            shipmentColor.delayed,
+            "approved",
+            shipmentColor.approved,
+            "delivered",
+            shipmentColor.delivered,
+            "planned",
+            shipmentColor.planned,
+            shipmentColor.cancelled,
+          ],
+          "line-width": 2,
+          "line-opacity": 0.55,
+        },
+      });
+
+      map.fitBounds(bounds, { padding: 60, duration: 1200 });
+    });
+
+    mapRef.current = map;
+
+    return () => {
+      shipmentMarkersRef.current.forEach((marker) => marker.remove());
+      hospitalMarkersRef.current.forEach((marker) => marker.remove());
+      map.remove();
+      mapRef.current = null;
+    };
+  }, [bounds, hospitals, shipments]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const source = map.getSource("shipment-routes") as GeoJSONSource | undefined;
+    if (source) {
+      source.setData(makeRouteGeoJson(hospitals, shipments));
+    }
+  }, [hospitals, shipments]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    hospitalMarkersRef.current.forEach((marker) => marker.remove());
+    hospitalMarkersRef.current = [];
+
+    hospitals.forEach((hospital) => {
+      const risk = forecasts
+        .filter((forecast) => forecast.hospitalId === hospital.id)
+        .reduce((max, forecast) => Math.max(max, forecast.shortageRiskScore), 0);
+
+      const el = document.createElement("div");
+      el.className = "hospital-node";
+      el.style.width = highlightedHospitalId === hospital.id ? "18px" : "14px";
+      el.style.height = highlightedHospitalId === hospital.id ? "18px" : "14px";
+      el.style.borderRadius = "999px";
+      el.style.border = highlightedHospitalId === hospital.id ? "2px solid #67e8f9" : "1px solid rgba(241,245,249,0.75)";
+      el.style.background = risk > 80 ? "#fb7185" : risk > 60 ? "#fb923c" : risk > 35 ? "#facc15" : "#4ade80";
+      el.style.boxShadow = highlightedHospitalId === hospital.id ? "0 0 24px rgba(34,211,238,.85)" : "0 0 14px rgba(15,23,42,.75)";
+
+      const marker = new mapboxgl.Marker({ element: el }).setLngLat(hospital.coordinates).setPopup(
+        new mapboxgl.Popup({ offset: 10 }).setHTML(
+          `<div style="font-family:system-ui;color:#0f172a"><strong>${hospital.name}</strong><br/>${hospital.city}<br/>Peak risk: ${Math.round(risk)}</div>`,
+        ),
+      );
+
+      marker.addTo(map);
+      hospitalMarkersRef.current.push(marker);
+    });
+  }, [forecasts, highlightedHospitalId, hospitals]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    shipmentMarkersRef.current.forEach((marker) => marker.remove());
+    shipmentMarkersRef.current = [];
+
+    shipments.forEach((shipment) => {
+      const el = document.createElement("div");
+      el.style.width = "11px";
+      el.style.height = "11px";
+      el.style.borderRadius = "999px";
+      el.style.background = shipmentColor[shipment.status];
+      el.style.boxShadow = `0 0 16px ${shipmentColor[shipment.status]}`;
+
+      const marker = new mapboxgl.Marker({ element: el }).setLngLat(shipment.currentCoordinates).setPopup(
+        new mapboxgl.Popup({ offset: 8 }).setHTML(
+          `<div style="font-family:system-ui;color:#0f172a"><strong>${shipment.bloodType} · ${shipment.quantity}u</strong><br/>Status: ${shipment.status.replaceAll("_", " ")}<br/>ETA: ${Math.round(shipment.etaMinutes)}m</div>`,
+        ),
+      );
+
+      marker.addTo(map);
+      shipmentMarkersRef.current.push(marker);
+    });
+  }, [shipments]);
+
+  return <div ref={mapContainerRef} className="h-[420px] w-full" aria-label="Shipment tracking map" />;
+}
