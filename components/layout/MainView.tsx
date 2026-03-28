@@ -1,10 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { BadgeCheck, ChevronsUpDown, House, LogOut } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +24,6 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
-  SidebarLayout,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -33,6 +42,13 @@ interface MainViewLogin {
   title: string;
   role: string;
   details: string[];
+  switchOptions?: Array<{
+    label: string;
+    href: string;
+    onSelect?: () => void;
+  }>;
+  logoutHref?: string;
+  onLogout?: () => void;
 }
 
 interface MainViewProps {
@@ -43,81 +59,115 @@ interface MainViewProps {
 
 function MainViewContent({ navigation, login, children }: MainViewProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { open } = useSidebar();
-  const [expanded, setExpanded] = useState(false);
 
   return (
-      <SidebarLayout className={styles.mainViewLayout}>
-        <Sidebar className={styles.mainViewSidebar}>
-          <SidebarHeader className="gap-4">
-            <div className="flex flex-col gap-1">
-              {open && <p className="m-0 text-xs font-semibold uppercase">B.Life</p>}
-              {open && <h1 className="m-0 text-2xl font-semibold">Main View</h1>}
-            </div>
+    <div className={styles.mainViewLayout}>
+      <Sidebar collapsible="icon" variant="inset" className={styles.mainViewSidebar}>
+        <SidebarHeader>
+          <div className={styles.mainViewSidebarHeaderRow}>
+            <SidebarMenu className={styles.mainViewSidebarHeaderMenu}>
+              <SidebarMenuItem className={styles.mainViewSidebarHeaderMenuItem}>
+                <SidebarMenuButton size="lg" render={<Link href={navigation[0]?.href ?? "#"} />}>
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                    <House className="size-4" />
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">B.Life</span>
+                    <span className="truncate text-xs">Hospital Workspace</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+            <SidebarTrigger className={styles.mainViewSidebarTrigger} />
+          </div>
+        </SidebarHeader>
 
-            <SidebarTrigger className="w-full">
-              {open ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-            </SidebarTrigger>
-          </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {navigation.map((item) => {
+                  const isActive = pathname === item.href;
 
-          <SidebarContent>
-            <SidebarGroup>
-              {open && <SidebarGroupLabel>Navigation</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {navigation.map((item) => {
-                    const isActive = pathname === item.href;
-
-                    return (
-                      <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton asChild isActive={isActive}>
-                          <Link href={item.href}>
-                            <House size={18} />
-                            {open && <span>{item.label}</span>}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        render={<Link href={item.href} />}
+                        isActive={isActive}
+                        tooltip={item.label}
+                      >
+                          <House size={18} />
+                          <span>{item.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
 
         <SidebarFooter>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <div className="flex min-w-0 flex-col gap-2">
-                <div className="flex min-w-0 items-center justify-between gap-2">
-                  {open && (
-                    <div className="min-w-0 flex-1">
-                      <p className="m-0 text-xs font-semibold uppercase">Current Login</p>
-                      <p className="m-0 mt-1 truncate">{login.title}</p>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton size="lg" tooltip={login.title}>
+                    <BadgeCheck className="size-4" />
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-medium">{login.title}</span>
+                      <span className="truncate text-xs">{login.role}</span>
                     </div>
-                  )}
-                  <button
-                    type="button"
-                    className="inline-flex min-h-8 items-center justify-center rounded-md border bg-background px-2"
-                    onClick={() => setExpanded((current) => !current)}
-                    aria-expanded={expanded}
-                  >
-                    {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                  </button>
-                </div>
-
-                {open && expanded && (
-                  <div className="flex min-w-0 flex-col gap-2">
-                    <p className="m-0 text-sm">{login.role}</p>
-                    {login.details.map((detail) => (
-                      <p key={detail} className="m-0 text-sm">
-                        {detail}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </SidebarGroupContent>
-          </SidebarGroup>
+                    <ChevronsUpDown className="ml-auto size-4" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side={open ? "top" : "right"} align="start">
+                  <DropdownMenuLabel>{login.title}</DropdownMenuLabel>
+                  {login.details.map((detail) => (
+                    <DropdownMenuLabel key={detail} className="pt-0 text-xs font-normal text-muted-foreground">
+                      {detail}
+                    </DropdownMenuLabel>
+                  ))}
+                  {(login.switchOptions?.length || login.onLogout || login.logoutHref) && <DropdownMenuSeparator />}
+                  {login.switchOptions?.length ? (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>Switch hospital</DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        {login.switchOptions.map((option) => (
+                          <DropdownMenuItem
+                            key={option.href}
+                            onClick={() => {
+                              option.onSelect?.();
+                              router.push(option.href);
+                            }}
+                          >
+                            {option.label}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  ) : null}
+                  {(login.onLogout || login.logoutHref) ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => {
+                        login.onLogout?.();
+                        if (login.logoutHref) {
+                          router.push(login.logoutHref);
+                        }
+                      }}
+                    >
+                      <LogOut className="size-4" />
+                      Log out
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
 
@@ -126,14 +176,23 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
           <CardContent className={styles.mainViewRouterCardContent}>{children}</CardContent>
         </Card>
       </SidebarInset>
-    </SidebarLayout>
+    </div>
   );
 }
 
 export function MainView({ navigation, login, children }: MainViewProps) {
   return (
     <div className={styles.mainView}>
-      <SidebarProvider defaultOpen>
+      <SidebarProvider
+        defaultOpen
+        className={styles.mainViewProvider}
+        style={
+          {
+            "--sidebar-width": "300px",
+            "--sidebar-width-icon": "55px",
+          } as React.CSSProperties
+        }
+      >
         <MainViewContent navigation={navigation} login={login}>
           {children}
         </MainViewContent>

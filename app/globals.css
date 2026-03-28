@@ -60,8 +60,7 @@ body {
 
 body {
   background:
-    radial-gradient(circle at top, rgba(56, 189, 248, 0.14), transparent 36%),
-    radial-gradient(circle at 85% 18%, rgba(251, 113, 133, 0.12), transparent 30%),
+    url("/background.png") center center / cover no-repeat,
     var(--background);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
 }

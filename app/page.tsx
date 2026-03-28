@@ -77,7 +77,7 @@ export default function LandingPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button type="button" variant="premium" className="w-full" onClick={enterHospital}>
+              <Button type="button" variant="default" className="w-full" onClick={enterHospital}>
                 Enter {selectedHospitalName ? `(${selectedHospitalName})` : "Hospital"}
               </Button>
             </GlassCard>
@@ -85,7 +85,7 @@ export default function LandingPage() {
             <GlassCard className="space-y-4 border-slate-200/90 bg-white/82">
               <h2 className="text-xl font-semibold">Control Tower Login</h2>
               <p className="text-sm text-slate-600">Monitor all hospitals, active transfers, and decision-engine recommendations.</p>
-              <Button type="button" variant="cyan" className="w-full" onClick={enterControlTower}>
+              <Button type="button" variant="outline" className="w-full" onClick={enterControlTower}>
                 Enter Regional Control Tower
               </Button>
             </GlassCard>

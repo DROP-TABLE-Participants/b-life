@@ -1,85 +1,96 @@
 .hospitalDashboard {
-  display: grid;
-  grid-template-rows: minmax(0, 10fr) minmax(0, 20fr) minmax(0, 40fr) minmax(0, 30fr);
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  height: 100%;
   min-height: 0;
+  overflow: visible;
 }
 
 .hospitalDashboardSection {
-  min-height: 0;
+  overflow: visible;
+  margin-bottom: 12px;
 }
 
 .hospitalDashboardHeadingSection {
   display: flex;
   align-items: center;
+  min-height: 50px;
 }
 
 .hospitalDashboardHeading {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
+  line-height: 2rem;
 }
 
 .hospitalDashboardInventorySection {
-  min-height: 0;
+  display: flex;
+  min-height: 300px;
 }
 
 .hospitalDashboardMiddleRow {
   display: grid;
   grid-template-columns: minmax(0, 65fr) minmax(0, 35fr);
-  gap: 16px;
-  min-height: 0;
+  gap: 12px;
+  min-height: 400px;
+  overflow: visible;
 }
 
 .hospitalDashboardCard {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .hospitalDashboardCardHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-direction: row;
   gap: 12px;
+  padding: 16px 16px 0;
+  flex-shrink: 0;
 }
 
 .hospitalDashboardCardTitle {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
+  line-height: 1.5rem;
 }
 
 .hospitalDashboardCardBody {
   flex: 1;
   min-height: 0;
+  padding: 16px;
 }
 
 .hospitalDashboardSelectTrigger {
-  width: 180px;
+  width: 80px;
+  min-width: 80px;
 }
 
 .hospitalDashboardChartWrap {
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  min-width: 0;
 }
 
 .hospitalDashboardChartArea {
   width: 100%;
-  height: 100%;
-  min-height: 220px;
+  min-width: 0;
+  min-height: 280px;
 }
 
 .hospitalDashboardTransfers {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   height: 100%;
   min-height: 0;
   overflow: auto;
+  padding-right: 4px;
 }
 
 .hospitalDashboardTransferItem {
@@ -100,13 +111,15 @@
 
 .hospitalDashboardTransferTitle {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.875rem;
   font-weight: 600;
+  line-height: 1.25rem;
 }
 
 .hospitalDashboardTransferText {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
 }
 
 .hospitalDashboardTransferActions {
@@ -121,21 +134,25 @@
 .hospitalDashboardDispatchCard {
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: 500px;
+  overflow: hidden;
+}
+
+.hospitalDashboardSection:last-child {
+  margin-bottom: 0;
 }
 
 .hospitalDashboardMapWrap {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }
 
 .hospitalDashboardMapFrame {
-  width: 100%;
-  height: 100%;
+  display: flex;
+  flex: 1;
   min-height: 0;
-  overflow: hidden;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
 }
 
 @media (max-width: 1100px) {

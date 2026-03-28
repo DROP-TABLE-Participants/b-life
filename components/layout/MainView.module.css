@@ -1,15 +1,23 @@
 .mainView {
   width: 100vw;
   height: 100vh;
-  padding: 16px;
   box-sizing: border-box;
   overflow: hidden;
-  background-color: #f8fafc;
+}
+
+.mainViewProvider {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: transparent;
 }
 
 .mainViewLayout {
+  display: flex;
   width: 100%;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
 }
 
 .mainViewSidebar {
@@ -17,130 +25,80 @@
   min-height: 0;
 }
 
-.mainViewSidebarTop {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.mainViewSidebar :global([data-slot="sidebar-inner"]) {
+  background: transparent;
 }
 
-.mainViewBrand {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.mainViewBrandLabel {
-  margin: 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.mainViewBrandTitle {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.mainViewSidebarToggle {
-  width: 100%;
-  min-height: 40px;
-  font: inherit;
-}
-
-.mainViewNav {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mainViewNavItem {
+.mainViewSidebarHeaderRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  text-decoration: none;
-  color: inherit;
+  min-width: 0;
 }
 
-.mainViewNavItemActive {
-  font-weight: 700;
-}
-
-.mainViewNavLabel {
-  display: inline-flex;
-}
-
-.mainViewLoginCard {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.mainViewLoginHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.mainViewLoginText {
+.mainViewSidebarHeaderMenu {
   min-width: 0;
   flex: 1;
 }
 
-.mainViewLoginLabel {
-  margin: 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.mainViewLoginValue {
-  margin: 4px 0 0;
-  font-size: 1rem;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mainViewLoginToggle {
-  font: inherit;
-}
-
-.mainViewLoginBody {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mainViewLoginDetail {
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-.mainViewRouterView {
-  height: 100%;
+.mainViewSidebarHeaderMenuItem {
   min-width: 0;
 }
 
+.mainViewSidebarHeaderMenuItem > * {
+  min-width: 0;
+}
+
+.mainViewSidebarTriggerRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mainViewSidebarTrigger {
+  flex-shrink: 0;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebarHeaderRow {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.mainViewRouterView {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 10px;
+}
+
 .mainViewRouterCard {
+  --main-view-router-card-background: #ffffffe0;
+  --main-view-router-card-border: rgba(226, 232, 240, 1);
+  --main-view-router-card-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  overflow: auto;
+  background-color: var(--main-view-router-card-background);
+  border: 1px solid var(--main-view-router-card-border);
   border-radius: 24px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--main-view-router-card-shadow);
 }
 
 .mainViewRouterCardContent {
-  height: 100%;
-  min-height: 0;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 20px 70px;
+  overflow: visible;
 }
 
 @media (max-width: 960px) {

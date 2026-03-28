@@ -10,21 +10,27 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { BloodTypeInsightSheet } from "@/components/dashboard/BloodTypeInsightSheet";
 import { HospitalBloodInventoryCards } from "@/components/dashboard/HospitalBloodInventoryCards";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ShipmentMapCanvas } from "@/components/map/ShipmentMapCanvas";
-import type { Forecast, Hospital, Shipment, TransferRecommendation } from "@/types/domain";
+import { cn } from "@/lib/utils";
+import { BLOOD_TYPES, type Forecast, type Hospital, type Shipment, type TransferRecommendation } from "@/types/domain";
+import surfaceStyles from "./DashboardCardSurface.module.css";
 import styles from "./HospitalDashboardView.module.css";
 
-const BLOOD_GROUP_OPTIONS = [
-  { group: "O", negative: "O-", positive: "O+" },
-  { group: "A", negative: "A-", positive: "A+" },
-  { group: "B", negative: "B-", positive: "B+" },
-  { group: "AB", negative: "AB-", positive: "AB+" },
-] as const;
+const FORECAST_OPTIONS = ["all", ...BLOOD_TYPES] as const;
+const PUBLIC_MAPBOX_TOKEN =
+  "pk.eyJ1IjoiYm5zYXZvdiIsImEiOiJjbTh1MzJmazEwaHhtMmlwZTk4djVyZDNrIn0.CIA7aiohbblSvgw6-4COLg";
+
+const recommendationBadgeClassNames = {
+  critical: "border-rose-200 bg-rose-50 text-rose-700",
+  high: "border-orange-200 bg-orange-50 text-orange-700",
+  elevated: "border-amber-200 bg-amber-50 text-amber-700",
+} as const;
 
 interface HospitalDashboardViewProps {
   hospital: Hospital;
@@ -47,33 +53,37 @@ export function HospitalDashboardView({
   onApproveRecommendation,
   onDispatchRecommendation,
 }: HospitalDashboardViewProps) {
-  const [selectedGroup, setSelectedGroup] = useState<(typeof BLOOD_GROUP_OPTIONS)[number]["group"]>("O");
+  const [selectedForecast, setSelectedForecast] = useState<(typeof FORECAST_OPTIONS)[number]>("all");
+  const [selectedBloodType, setSelectedBloodType] = useState<(typeof BLOOD_TYPES)[number] | null>(null);
 
   const hospitalForecasts = forecasts.filter((forecast) => forecast.hospitalId === hospital.id);
-  const groupSelection = BLOOD_GROUP_OPTIONS.find((option) => option.group === selectedGroup) ?? BLOOD_GROUP_OPTIONS[0];
+
+  const chartColor = selectedForecast === "all" ? "#0f172a" : selectedForecast.endsWith("-") ? "#f43f5e" : "#0ea5e9";
 
   const chartData = useMemo(() => {
-    const negativeForecast = hospitalForecasts.find((forecast) => forecast.bloodType === groupSelection.negative);
-    const positiveForecast = hospitalForecasts.find((forecast) => forecast.bloodType === groupSelection.positive);
+    const selectedForecasts =
+      selectedForecast === "all"
+        ? hospitalForecasts
+        : hospitalForecasts.filter((forecast) => forecast.bloodType === selectedForecast);
+
+    const sumField = (field: keyof Pick<Forecast, "currentUnits" | "predictedDemand24h" | "predictedDemand48h">) =>
+      selectedForecasts.reduce((total, forecast) => total + forecast[field], 0);
 
     return [
       {
         label: "Current",
-        negative: negativeForecast?.currentUnits ?? 0,
-        positive: positiveForecast?.currentUnits ?? 0,
+        value: sumField("currentUnits"),
       },
       {
         label: "24h",
-        negative: negativeForecast?.predictedDemand24h ?? 0,
-        positive: positiveForecast?.predictedDemand24h ?? 0,
+        value: sumField("predictedDemand24h"),
       },
       {
         label: "48h",
-        negative: negativeForecast?.predictedDemand48h ?? 0,
-        positive: positiveForecast?.predictedDemand48h ?? 0,
+        value: sumField("predictedDemand48h"),
       },
     ];
-  }, [groupSelection.negative, groupSelection.positive, hospitalForecasts]);
+  }, [hospitalForecasts, selectedForecast]);
 
   const myRecommendations = recommendations.filter(
     (recommendation) => recommendation.toHospitalId === hospital.id || recommendation.fromHospitalId === hospital.id,
@@ -88,25 +98,32 @@ export function HospitalDashboardView({
   return (
     <div className={styles.hospitalDashboard}>
       <section className={`${styles.hospitalDashboardSection} ${styles.hospitalDashboardHeadingSection}`}>
-        <h1 className={styles.hospitalDashboardHeading}>{hospital.name}</h1>
+        <h2 className={styles.hospitalDashboardHeading}>{hospital.name}</h2>
       </section>
 
       <section className={`${styles.hospitalDashboardSection} ${styles.hospitalDashboardInventorySection}`}>
-        <HospitalBloodInventoryCards hospital={hospital} forecasts={hospitalForecasts} />
+        <HospitalBloodInventoryCards
+          hospital={hospital}
+          forecasts={hospitalForecasts}
+          onSelectBloodType={setSelectedBloodType}
+        />
       </section>
 
       <section className={`${styles.hospitalDashboardSection} ${styles.hospitalDashboardMiddleRow}`}>
-        <Card className={styles.hospitalDashboardCard}>
+        <Card className={cn(surfaceStyles.dashboardCardSurface, styles.hospitalDashboardCard)}>
           <CardHeader className={styles.hospitalDashboardCardHeader}>
-            <h2 className={styles.hospitalDashboardCardTitle}>Forecast</h2>
-            <Select value={selectedGroup} onValueChange={(value) => setSelectedGroup(value as (typeof BLOOD_GROUP_OPTIONS)[number]["group"])}>
+            <CardTitle className={styles.hospitalDashboardCardTitle}>Forecast</CardTitle>
+            <Select
+              value={selectedForecast}
+              onValueChange={(value) => setSelectedForecast(value as (typeof FORECAST_OPTIONS)[number])}
+            >
               <SelectTrigger className={styles.hospitalDashboardSelectTrigger}>
-                <SelectValue placeholder="Select blood group" />
+                <SelectValue placeholder="Select blood type" />
               </SelectTrigger>
               <SelectContent>
-                {BLOOD_GROUP_OPTIONS.map((option) => (
-                  <SelectItem key={option.group} value={option.group}>
-                    {option.group}
+                {FORECAST_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option === "all" ? "All" : option}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -114,23 +131,22 @@ export function HospitalDashboardView({
           </CardHeader>
           <CardContent className={`${styles.hospitalDashboardCardBody} ${styles.hospitalDashboardChartWrap}`}>
             <div className={styles.hospitalDashboardChartArea}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="label" />
                   <YAxis />
                   <Tooltip />
-                  <Line type="monotone" dataKey="negative" stroke="#f43f5e" strokeWidth={2} />
-                  <Line type="monotone" dataKey="positive" stroke="#0ea5e9" strokeWidth={2} />
+                  <Line type="monotone" dataKey="value" stroke={chartColor} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card className={styles.hospitalDashboardCard}>
+        <Card className={cn(surfaceStyles.dashboardCardSurface, styles.hospitalDashboardCard)}>
           <CardHeader className={styles.hospitalDashboardCardHeader}>
-            <h2 className={styles.hospitalDashboardCardTitle}>Recommended Transfers</h2>
+            <CardTitle className={styles.hospitalDashboardCardTitle}>Recommended Transfers</CardTitle>
           </CardHeader>
           <CardContent className={styles.hospitalDashboardCardBody}>
             <div className={styles.hospitalDashboardTransfers}>
@@ -140,15 +156,18 @@ export function HospitalDashboardView({
                     <p className={styles.hospitalDashboardTransferTitle}>
                       {recommendation.bloodType} · {recommendation.suggestedQuantity}u
                     </p>
-                    <StatusBadge
-                      status={
+                    <Badge
+                      className={cn(
                         recommendation.urgency === "critical"
-                          ? "critical"
+                          ? recommendationBadgeClassNames.critical
                           : recommendation.urgency === "high"
-                            ? "high"
-                            : "elevated"
-                      }
-                    />
+                            ? recommendationBadgeClassNames.high
+                            : recommendationBadgeClassNames.elevated,
+                      )}
+                      variant="outline"
+                    >
+                      {recommendation.urgency}
+                    </Badge>
                   </div>
                   <p className={styles.hospitalDashboardTransferText}>{recommendation.reason}</p>
                   <div className={styles.hospitalDashboardTransferActions}>
@@ -185,22 +204,36 @@ export function HospitalDashboardView({
       </section>
 
       <section className={styles.hospitalDashboardSection}>
-        <Card className={styles.hospitalDashboardDispatchCard}>
+        <Card className={cn(surfaceStyles.dashboardCardSurface, styles.hospitalDashboardDispatchCard)}>
           <CardHeader className={styles.hospitalDashboardCardHeader}>
-            <h2 className={styles.hospitalDashboardCardTitle}>Real-Time Dispatches</h2>
+            <CardTitle className={styles.hospitalDashboardCardTitle}>Real-Time Dispatches</CardTitle>
           </CardHeader>
-          <CardContent className={`${styles.hospitalDashboardCardBody} ${styles.hospitalDashboardMapWrap}`}>
+          <div className={styles.hospitalDashboardMapWrap}>
             <div className={styles.hospitalDashboardMapFrame}>
               <ShipmentMapCanvas
                 hospitals={hospitals}
                 shipments={dispatchShipments}
                 forecasts={hospitalForecasts}
                 highlightedHospitalId={hospital.id}
+                mapboxToken={PUBLIC_MAPBOX_TOKEN}
               />
             </div>
-          </CardContent>
+          </div>
         </Card>
       </section>
+
+      <BloodTypeInsightSheet
+        open={selectedBloodType !== null}
+        bloodType={selectedBloodType}
+        hospital={hospital}
+        hospitals={hospitals}
+        forecasts={hospitalForecasts}
+        shipments={dispatchShipments}
+        recommendations={myRecommendations}
+        onOpenChange={(open) => {
+          if (!open) setSelectedBloodType(null);
+        }}
+      />
     </div>
   );
 }

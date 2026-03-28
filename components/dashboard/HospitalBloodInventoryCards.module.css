@@ -1,94 +1,100 @@
 .inventoryGrid {
   display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   gap: 12px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
 }
 
 .inventoryCard {
+  --dashboard-card-background: rgba(255, 255, 255, 0.32);
+  --dashboard-card-border: rgba(226, 232, 240, 0.65);
+  position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  border: 1px solid rgba(226, 232, 240, 0.95);
-  background: rgba(255, 255, 255, 0.88);
+  min-width: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 160ms ease;
 }
 
-.inventoryCardHeader {
+.inventoryCard:hover {
+  --dashboard-card-border: rgba(148, 163, 184, 0.95);
+}
+
+.inventoryCardContent {
+  position: relative;
+  z-index: 1;
   display: flex;
-  align-items: flex-start;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+
+.inventoryCardHeaderTopRow {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
 .inventoryCardGroup {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.125rem;
   font-weight: 700;
-  line-height: 1;
-  color: #0f172a;
-}
-
-.inventoryCardTotals {
-  text-align: right;
-}
-
-.inventoryCardUnits {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
+  line-height: 1.75rem;
   color: #0f172a;
 }
 
 .inventoryCardRisk {
-  margin: 4px 0 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  margin-top: 0;
+  width: fit-content;
 }
 
-.inventoryRows {
+.inventoryAmountRow {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 20px;
-}
-
-.inventoryRow {
-  display: grid;
-  grid-template-columns: 2.25rem minmax(0, 1fr) max-content;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: space-between;
   gap: 12px;
 }
 
-.inventoryLabel {
-  font-size: 0.92rem;
+.inventoryAmountValueGroup {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.inventoryAmountValue {
+  font-size: 2rem;
   font-weight: 700;
-  color: #334155;
+  line-height: 2.5rem;
+  color: #0f172a;
 }
 
-.inventoryTrack {
-  height: 34px;
-  overflow: hidden;
-  border-radius: 14px;
-  background: #e2e8f0;
-}
-
-.inventoryFill {
-  height: 100%;
-  border-radius: 14px;
-}
-
-.inventoryFillNegative {
-  background: linear-gradient(90deg, #fb7185 0%, #f43f5e 100%);
-}
-
-.inventoryFillPositive {
-  background: linear-gradient(90deg, #22d3ee 0%, #0ea5e9 100%);
-}
-
-.inventoryValue {
-  font-size: 0.9rem;
+.inventoryAmountDivider {
+  font-size: 1.25rem;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: #475569;
+  line-height: 1.75rem;
+  color: #94a3b8;
+}
+
+.inventoryAmountMax {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.75rem;
+  color: #94a3b8;
+}
+
+.inventoryExpandButton {
+  flex-shrink: 0;
+  color: #94a3b8;
 }
 
 @media (max-width: 1280px) {

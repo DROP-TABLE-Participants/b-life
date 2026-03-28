@@ -78,7 +78,7 @@ export function HospitalOverview({
                     {shipment.fromHospitalId === hospital.id ? "Outgoing" : "Incoming"} · ETA {Math.round(shipment.etaMinutes)}m
                   </p>
                   {(shipment.status === "approved" || shipment.status === "planned") && shipment.fromHospitalId === currentHospitalId && (
-                    <Button type="button" variant="cyan" size="sm" className="mt-2" onClick={() => onDispatchShipment(shipment.id)}>
+                    <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => onDispatchShipment(shipment.id)}>
                       Dispatch Shipment
                     </Button>
                   )}
@@ -113,7 +113,7 @@ export function HospitalOverview({
                     </Button>
                   )}
                   {recommendation.fromHospitalId === currentHospitalId && recommendation.status === "approved" && (
-                    <Button type="button" variant="premium" size="sm" onClick={() => onDispatchRecommendation(recommendation.id)}>
+                    <Button type="button" variant="default" size="sm" onClick={() => onDispatchRecommendation(recommendation.id)}>
                       Dispatch
                     </Button>
                   )}

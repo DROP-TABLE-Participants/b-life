@@ -50,6 +50,13 @@ export default function HospitalPage() {
         title: activeHospital.name,
         role: "Hospital Login",
         details: [activeHospital.city],
+        switchOptions: hospitals.map((hospital) => ({
+          label: `${hospital.name} · ${hospital.city}`,
+          href: `/hospital/${hospital.id}`,
+          onSelect: () => setSession({ mode: "hospital", hospitalId: hospital.id }),
+        })),
+        logoutHref: "/",
+        onLogout: () => setSession({ mode: null, hospitalId: null }),
       }}
     >
       <HospitalDashboardView

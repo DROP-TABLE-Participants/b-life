@@ -1,319 +1,197 @@
 "use client";
 
-import mapboxgl, { type GeoJSONSource } from "mapbox-gl";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Feature, FeatureCollection, LineString } from "geojson";
+import { useMemo, useRef, useState } from "react";
+import type { FeatureCollection, Point } from "geojson";
+import Map, { Layer, NavigationControl, Source, type LayerProps, type MapRef } from "react-map-gl/mapbox";
 import type { Forecast, Hospital, Shipment } from "@/types/domain";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 interface ShipmentMapCanvasProps {
   hospitals: Hospital[];
   shipments: Shipment[];
   forecasts: Forecast[];
   highlightedHospitalId?: string;
+  mapboxToken: string;
+  mode?: "base" | "riskHeatmap";
 }
 
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
-
-const shipmentColor: Record<Shipment["status"], string> = {
-  planned: "#94a3b8",
-  approved: "#38bdf8",
-  in_transit: "#22d3ee",
-  delayed: "#f59e0b",
-  delivered: "#10b981",
-  cancelled: "#fb7185",
+const INITIAL_VIEW_STATE = {
+  longitude: 23.3219,
+  latitude: 42.6977,
+  zoom: 10.5,
 };
 
-const ensureMapboxToken = () => {
-  if (!mapboxgl.accessToken) {
-    mapboxgl.accessToken = "no-token-required-for-external-style";
-  }
+const heatmapLayer: LayerProps = {
+  id: "hospital-risk-heatmap",
+  type: "heatmap",
+  source: "hospital-risk",
+  maxzoom: 15,
+  paint: {
+    "heatmap-weight": [
+      "interpolate",
+      ["linear"],
+      ["get", "riskScore"],
+      0,
+      0,
+      100,
+      1,
+    ],
+    "heatmap-intensity": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      5,
+      1.4,
+      10,
+      2.8,
+    ],
+    "heatmap-radius": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      5,
+      34,
+      10,
+      58,
+      14,
+      76,
+    ],
+    "heatmap-opacity": 1,
+    "heatmap-color": [
+      "interpolate",
+      ["linear"],
+      ["heatmap-density"],
+      0,
+      "rgba(34,197,94,0.15)",
+      0.15,
+      "rgba(163,230,53,0.45)",
+      0.35,
+      "rgba(250,204,21,0.72)",
+      0.6,
+      "rgba(249,115,22,0.88)",
+      1,
+      "rgba(239,68,68,0.98)",
+    ],
+  },
 };
 
-const makeRouteGeoJson = (hospitals: Hospital[], shipments: Shipment[]): FeatureCollection<LineString> => {
-  const byId = Object.fromEntries(hospitals.map((hospital) => [hospital.id, hospital]));
+const riskPointLayer: LayerProps = {
+  id: "hospital-risk-points",
+  type: "circle",
+  source: "hospital-risk",
+  minzoom: 7,
+  paint: {
+    "circle-radius": [
+      "interpolate",
+      ["linear"],
+      ["get", "riskScore"],
+      0,
+      7,
+      100,
+      18,
+    ],
+    "circle-color": [
+      "interpolate",
+      ["linear"],
+      ["get", "riskScore"],
+      0,
+      "#22c55e",
+      35,
+      "#facc15",
+      60,
+      "#fb923c",
+      80,
+      "#ef4444",
+    ],
+    "circle-stroke-color": "#ffffff",
+    "circle-stroke-width": 1.5,
+    "circle-opacity": 0.95,
+  },
+};
 
-  const features = shipments.reduce<Array<Feature<LineString>>>((acc, shipment) => {
-    const from = byId[shipment.fromHospitalId];
-    const to = byId[shipment.toHospitalId];
-    if (!from || !to) return acc;
+export function ShipmentMapCanvas({ hospitals, forecasts, mapboxToken, mode = "base" }: ShipmentMapCanvasProps) {
+  const mapRef = useRef<MapRef | null>(null);
+  const [center, setCenter] = useState<[number, number]>([
+    INITIAL_VIEW_STATE.longitude,
+    INITIAL_VIEW_STATE.latitude,
+  ]);
+  const [zoom, setZoom] = useState(INITIAL_VIEW_STATE.zoom);
+  const riskGeoJson = useMemo<FeatureCollection<Point>>(() => {
+    return {
+      type: "FeatureCollection",
+      features: hospitals.map((hospital) => {
+        const riskScore = forecasts
+          .filter((forecast) => forecast.hospitalId === hospital.id)
+          .reduce((max, forecast) => Math.max(max, forecast.shortageRiskScore), 0);
 
-    acc.push({
-      type: "Feature",
-      geometry: {
-        type: "LineString",
-        coordinates: [from.coordinates, to.coordinates],
-      },
-      properties: {
-        id: shipment.id,
-        status: shipment.status,
-      },
+        return {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: hospital.coordinates,
+          },
+          properties: {
+            hospitalId: hospital.id,
+            hospitalName: hospital.name,
+            city: hospital.city,
+            riskScore,
+          },
+        };
+      }),
+    };
+  }, [forecasts, hospitals]);
+
+  const handleReset = () => {
+    mapRef.current?.flyTo({
+      center: [INITIAL_VIEW_STATE.longitude, INITIAL_VIEW_STATE.latitude],
+      zoom: INITIAL_VIEW_STATE.zoom,
     });
-
-    return acc;
-  }, []);
-
-  return {
-    type: "FeatureCollection",
-    features,
   };
-};
 
-export function ShipmentMapCanvas({ hospitals, shipments, forecasts, highlightedHospitalId }: ShipmentMapCanvasProps) {
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const hospitalMarkersRef = useRef<mapboxgl.Marker[]>([]);
-  const shipmentMarkersRef = useRef<mapboxgl.Marker[]>([]);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [showFallback, setShowFallback] = useState(false);
-
-  const bounds = useMemo(() => {
-    const mapBounds = new mapboxgl.LngLatBounds();
-    hospitals.forEach((hospital) => mapBounds.extend(hospital.coordinates));
-    return mapBounds;
-  }, [hospitals]);
-
-  const fallbackProjection = useMemo(() => {
-    const lngs = hospitals.map((hospital) => hospital.coordinates[0]);
-    const lats = hospitals.map((hospital) => hospital.coordinates[1]);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-
-    const toPoint = ([lng, lat]: [number, number]) => {
-      const x = ((lng - minLng) / Math.max(0.1, maxLng - minLng)) * 100;
-      const y = 100 - ((lat - minLat) / Math.max(0.1, maxLat - minLat)) * 100;
-      return { x, y };
-    };
-
-    return { toPoint };
-  }, [hospitals]);
-
-  useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
-
-    ensureMapboxToken();
-
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: MAP_STYLE,
-      center: [25.3, 42.7],
-      zoom: 6,
-      pitch: 36,
-      bearing: -9,
-      interactive: true,
-      attributionControl: false,
-    });
-
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
-    map.on("error", (event) => {
-      console.warn("Map renderer fallback enabled:", event?.error?.message ?? "unknown map error");
-      setShowFallback(true);
-    });
-
-    map.on("load", () => {
-      setMapLoaded(true);
-      map.addSource("shipment-routes", {
-        type: "geojson",
-        data: makeRouteGeoJson(hospitals, shipments),
-      });
-
-      map.addLayer({
-        id: "shipment-routes",
-        type: "line",
-        source: "shipment-routes",
-        paint: {
-          "line-color": [
-            "match",
-            ["get", "status"],
-            "in_transit",
-            shipmentColor.in_transit,
-            "delayed",
-            shipmentColor.delayed,
-            "approved",
-            shipmentColor.approved,
-            "delivered",
-            shipmentColor.delivered,
-            "planned",
-            shipmentColor.planned,
-            shipmentColor.cancelled,
-          ],
-          "line-width": 2,
-          "line-opacity": 0.55,
-        },
-      });
-
-      map.fitBounds(bounds, { padding: 60, duration: 1200 });
-    });
-
-    mapRef.current = map;
-    const fallbackTimeout = window.setTimeout(() => {
-      if (!mapLoaded) setShowFallback(true);
-    }, 3500);
-
-    return () => {
-      window.clearTimeout(fallbackTimeout);
-      shipmentMarkersRef.current.forEach((marker) => marker.remove());
-      hospitalMarkersRef.current.forEach((marker) => marker.remove());
-      map.remove();
-      mapRef.current = null;
-    };
-  }, [bounds, hospitals, mapLoaded, shipments]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const source = map.getSource("shipment-routes") as GeoJSONSource | undefined;
-    if (source) {
-      source.setData(makeRouteGeoJson(hospitals, shipments));
-    }
-  }, [hospitals, shipments]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    hospitalMarkersRef.current.forEach((marker) => marker.remove());
-    hospitalMarkersRef.current = [];
-
-    hospitals.forEach((hospital) => {
-      const risk = forecasts
-        .filter((forecast) => forecast.hospitalId === hospital.id)
-        .reduce((max, forecast) => Math.max(max, forecast.shortageRiskScore), 0);
-
-      const el = document.createElement("div");
-      el.className = "hospital-node";
-      el.style.width = highlightedHospitalId === hospital.id ? "18px" : "14px";
-      el.style.height = highlightedHospitalId === hospital.id ? "18px" : "14px";
-      el.style.borderRadius = "999px";
-      el.style.border = highlightedHospitalId === hospital.id ? "2px solid #67e8f9" : "1px solid rgba(241,245,249,0.75)";
-      el.style.background = risk > 80 ? "#fb7185" : risk > 60 ? "#fb923c" : risk > 35 ? "#facc15" : "#4ade80";
-      el.style.boxShadow = highlightedHospitalId === hospital.id ? "0 0 24px rgba(34,211,238,.85)" : "0 0 14px rgba(15,23,42,.75)";
-
-      const marker = new mapboxgl.Marker({ element: el }).setLngLat(hospital.coordinates).setPopup(
-        new mapboxgl.Popup({ offset: 10 }).setHTML(
-          `<div style="font-family:system-ui;color:#0f172a"><strong>${hospital.name}</strong><br/>${hospital.city}<br/>Peak risk: ${Math.round(risk)}</div>`,
-        ),
-      );
-
-      marker.addTo(map);
-      hospitalMarkersRef.current.push(marker);
-    });
-  }, [forecasts, highlightedHospitalId, hospitals]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const existingById = new Map<string, mapboxgl.Marker>();
-    shipmentMarkersRef.current.forEach((marker) => {
-      const shipmentId = marker.getElement().dataset.shipmentId;
-      if (shipmentId) existingById.set(shipmentId, marker);
-    });
-
-    const activeIds = new Set<string>();
-    const updatedMarkers: mapboxgl.Marker[] = [];
-
-    shipments.forEach((shipment) => {
-      activeIds.add(shipment.id);
-      const existing = existingById.get(shipment.id);
-      if (existing) {
-        const el = existing.getElement();
-        el.style.background = shipmentColor[shipment.status];
-        el.style.boxShadow = `0 0 16px ${shipmentColor[shipment.status]}`;
-        existing.setLngLat(shipment.currentCoordinates);
-        updatedMarkers.push(existing);
-        return;
-      }
-
-      const el = document.createElement("div");
-      el.dataset.shipmentId = shipment.id;
-      el.style.width = "11px";
-      el.style.height = "11px";
-      el.style.borderRadius = "999px";
-      el.style.background = shipmentColor[shipment.status];
-      el.style.boxShadow = `0 0 16px ${shipmentColor[shipment.status]}`;
-
-      const marker = new mapboxgl.Marker({ element: el }).setLngLat(shipment.currentCoordinates).setPopup(
-        new mapboxgl.Popup({ offset: 8 }).setHTML(
-          `<div style="font-family:system-ui;color:#0f172a"><strong>${shipment.bloodType} · ${shipment.quantity}u</strong><br/>Status: ${shipment.status.replaceAll("_", " ")}<br/>ETA: ${Math.round(shipment.etaMinutes)}m</div>`,
-        ),
-      );
-
-      marker.addTo(map);
-      updatedMarkers.push(marker);
-    });
-
-    existingById.forEach((marker, shipmentId) => {
-      if (!activeIds.has(shipmentId)) {
-        marker.remove();
-      }
-    });
-
-    shipmentMarkersRef.current = updatedMarkers;
-  }, [shipments]);
-
-  if (showFallback || !mapLoaded) {
-    const hospitalById = Object.fromEntries(hospitals.map((hospital) => [hospital.id, hospital]));
-
+  if (!mapboxToken) {
     return (
-      <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_10%_20%,rgba(34,211,238,.2),transparent_40%),radial-gradient(circle_at_80%_10%,rgba(251,113,133,.2),transparent_35%),#030712]">
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {shipments.map((shipment) => {
-            const from = hospitalById[shipment.fromHospitalId];
-            const to = hospitalById[shipment.toHospitalId];
-            if (!from || !to) return null;
-            const start = fallbackProjection.toPoint(from.coordinates);
-            const end = fallbackProjection.toPoint(to.coordinates);
-            const current = fallbackProjection.toPoint(shipment.currentCoordinates);
-
-            return (
-              <g key={shipment.id}>
-                <line
-                  x1={start.x}
-                  y1={start.y}
-                  x2={end.x}
-                  y2={end.y}
-                  stroke={shipmentColor[shipment.status]}
-                  strokeWidth="0.35"
-                  opacity="0.5"
-                />
-                <circle cx={current.x} cy={current.y} r="0.95" fill={shipmentColor[shipment.status]}>
-                  <animate attributeName="opacity" values="0.2;1;0.2" dur="1.8s" repeatCount="indefinite" />
-                </circle>
-              </g>
-            );
-          })}
-        </svg>
-
-        {hospitals.map((hospital) => {
-          const risk = forecasts
-            .filter((forecast) => forecast.hospitalId === hospital.id)
-            .reduce((max, forecast) => Math.max(max, forecast.shortageRiskScore), 0);
-          const point = fallbackProjection.toPoint(hospital.coordinates);
-
-          return (
-            <div
-              key={hospital.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${point.x}%`, top: `${point.y}%` }}
-            >
-              <div
-                className={`h-3.5 w-3.5 rounded-full border ${highlightedHospitalId === hospital.id ? "border-cyan-300" : "border-white/40"}`}
-                style={{ background: risk > 80 ? "#fb7185" : risk > 60 ? "#fb923c" : risk > 35 ? "#facc15" : "#4ade80" }}
-              />
-              <p className="mt-1 text-[10px] text-slate-200/90">{hospital.city}</p>
-            </div>
-          );
-        })}
-
-        <div className="absolute bottom-3 left-3 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-slate-300">
-          Simulation routing view
-        </div>
+      <div className="flex h-full w-full items-center justify-center rounded-[inherit] bg-slate-100 text-sm text-slate-500">
+        Missing Mapbox token
       </div>
     );
   }
 
-  return <div ref={mapContainerRef} className="h-full w-full" aria-label="Shipment tracking map" />;
+  return (
+    <div className="relative h-[500px] w-full overflow-hidden rounded-[inherit]">
+      <div className="absolute left-3 top-3 z-10 rounded-md bg-slate-900/85 px-3 py-2 font-mono text-xs text-white">
+        Longitude: {center[0].toFixed(4)} | Latitude: {center[1].toFixed(4)} | Zoom: {zoom.toFixed(2)}
+      </div>
+
+      <button
+        type="button"
+        onClick={handleReset}
+        className="absolute left-3 top-14 z-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
+      >
+        Reset
+      </button>
+
+      <Map
+        ref={mapRef}
+        mapboxAccessToken={mapboxToken}
+        mapStyle="mapbox://styles/mapbox/light-v11"
+        initialViewState={INITIAL_VIEW_STATE}
+        maxZoom={20}
+        minZoom={3}
+        style={{ width: "100%", height: "100%", backgroundColor: "#e2e8f0" }}
+        attributionControl={false}
+        onMove={(event) => {
+          setCenter([event.viewState.longitude, event.viewState.latitude]);
+          setZoom(event.viewState.zoom);
+        }}
+      >
+        <NavigationControl position="top-right" />
+        {mode === "riskHeatmap" ? (
+          <Source id="hospital-risk" type="geojson" data={riskGeoJson}>
+            <Layer {...heatmapLayer} />
+            <Layer {...riskPointLayer} />
+          </Source>
+        ) : null}
+      </Map>
+    </div>
+  );
 }

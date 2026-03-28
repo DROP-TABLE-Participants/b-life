@@ -1,0 +1,135 @@
+.bloodTypeSheetContent {
+  width: min(92vw, 560px);
+  max-width: min(92vw, 560px) !important;
+  overflow: auto;
+  padding: 0;
+}
+
+.bloodTypeSheetHeader {
+  padding: 20px 20px 12px;
+}
+
+.bloodTypeSheetHeadingRow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bloodTypeSheetTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bloodTypeSheetTitle {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.bloodTypeSheetDescription {
+  margin-top: 4px;
+}
+
+.bloodTypeSheetRiskBadge {
+  flex-shrink: 0;
+}
+
+.bloodTypeSheetBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 20px 20px;
+}
+
+.bloodTypeSheetCard {
+  overflow: hidden;
+}
+
+.bloodTypeSheetCardHeader {
+  padding: 16px 16px 0;
+}
+
+.bloodTypeSheetCardTitle {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.bloodTypeSheetCardContent {
+  padding: 16px;
+}
+
+.bloodTypeSheetChartWrap {
+  width: 100%;
+  min-width: 0;
+  min-height: 220px;
+}
+
+.bloodTypeSheetStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bloodTypeSheetStatCard {
+  overflow: hidden;
+}
+
+.bloodTypeSheetStatContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.bloodTypeSheetStatLabel,
+.bloodTypeSheetMetricLabel,
+.bloodTypeSheetRecommendationText,
+.bloodTypeSheetEmptyState {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #475569;
+}
+
+.bloodTypeSheetStatValue,
+.bloodTypeSheetMetricValue {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.bloodTypeSheetListCardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.bloodTypeSheetMetricRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bloodTypeSheetBulletRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.bloodTypeSheetBullet {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .bloodTypeSheetStatsGrid {
+    grid-template-columns: 1fr;
+  }
+}

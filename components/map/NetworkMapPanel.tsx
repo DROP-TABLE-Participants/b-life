@@ -7,6 +7,9 @@ const MapCanvas = dynamic(() => import("@/components/map/ShipmentMapCanvas").the
   ssr: false,
 });
 
+const PUBLIC_MAPBOX_TOKEN =
+  "pk.eyJ1IjoiYm5zYXZvdiIsImEiOiJjbTh1MzJmazEwaHhtMmlwZTk4djVyZDNrIn0.CIA7aiohbblSvgw6-4COLg";
+
 interface NetworkMapPanelProps {
   hospitals: Hospital[];
   shipments: Shipment[];
@@ -28,6 +31,7 @@ export function NetworkMapPanel({ hospitals, shipments, forecasts, highlightedHo
         shipments={shipments}
         forecasts={forecasts}
         highlightedHospitalId={highlightedHospitalId}
+        mapboxToken={PUBLIC_MAPBOX_TOKEN}
       />
     </section>
   );

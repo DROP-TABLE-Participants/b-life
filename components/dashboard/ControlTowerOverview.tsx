@@ -106,7 +106,7 @@ export function ControlTowerOverview({
                     </Button>
                   )}
                   {recommendation.status === "approved" && (
-                    <Button type="button" variant="cyan" size="sm" onClick={() => onDispatchRecommendation(recommendation.id)}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => onDispatchRecommendation(recommendation.id)}>
                       Dispatch
                     </Button>
                   )}
@@ -276,7 +276,7 @@ export function ControlTowerOverview({
           <div className="flex items-end">
             <Button
               type="button"
-              variant="cyan"
+              variant="outline"
               className="w-full"
               onClick={submitManualShipment}
               disabled={!fromHospitalId || !toHospitalId || fromHospitalId === toHospitalId}
