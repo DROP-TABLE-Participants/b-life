@@ -55,6 +55,8 @@ async def create_tables() -> None:
     from app.models import models  # noqa: F401 – registers metadata
 
     async with engine.begin() as conn:
+        # Drop all tables first so the seed is always idempotent
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
 

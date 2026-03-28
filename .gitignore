@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+.env
+.venv
+venv/
+ENV/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+uvicorn.log
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Env files
+.env
+.env.local
+.env.production.local
+.env.test.local
+.env.development.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Coverage
+htmlcov/
+.coverage
+.pytest_cache/
+coverage.xml
