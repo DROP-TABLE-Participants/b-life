@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { STATUS_COLORS } from "@/lib/constants";
 import type { RiskLevel, ShipmentStatus } from "@/types/domain";
 
@@ -6,18 +7,18 @@ interface StatusBadgeProps {
 }
 
 const riskClass: Record<RiskLevel, string> = {
-  safe: "bg-emerald-500/20 text-emerald-200",
-  elevated: "bg-amber-500/20 text-amber-200",
-  high: "bg-orange-500/20 text-orange-200",
-  critical: "bg-rose-500/20 text-rose-200",
+  safe: "bg-emerald-100 text-emerald-700",
+  elevated: "bg-amber-100 text-amber-700",
+  high: "bg-orange-100 text-orange-700",
+  critical: "bg-rose-100 text-rose-700",
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {
   const classes = status in STATUS_COLORS ? STATUS_COLORS[status as ShipmentStatus] : riskClass[status as RiskLevel];
 
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${classes}`}>
+    <Badge className={classes}>
       {status.replaceAll("_", " ")}
-    </span>
+    </Badge>
   );
 }

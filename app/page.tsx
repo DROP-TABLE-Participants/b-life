@@ -4,7 +4,10 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { BloodNetworkScene } from "@/components/three/BloodNetworkScene";
+import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 import { useInitializeAppState } from "@/hooks/useInitializeAppState";
 import { useAppStore } from "@/store/useAppStore";
@@ -36,7 +39,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
       <div className="absolute inset-0 p-4 lg:p-10">
         <BloodNetworkScene />
       </div>
@@ -48,50 +51,43 @@ export default function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55 }}
         >
-          <GlassCard className="self-start border-white/20 bg-slate-950/60 p-8 lg:p-10">
-            <p className="text-xs uppercase tracking-[0.35em] text-cyan-200/90">Regional Logistics Intelligence</p>
-            <h1 className="mt-4 text-6xl font-semibold tracking-tight text-white">{APP_NAME}</h1>
-            <p className="mt-3 max-w-lg text-lg text-slate-200/90">{APP_TAGLINE}</p>
-            <p className="mt-5 max-w-xl text-sm leading-relaxed text-slate-300">
+          <GlassCard className="self-start border-slate-200/90 bg-white/78 p-8 lg:p-10">
+            <p className="text-xs uppercase tracking-[0.35em] text-cyan-700">Regional Logistics Intelligence</p>
+            <h1 className="mt-4 text-6xl font-semibold tracking-tight text-slate-950">{APP_NAME}</h1>
+            <p className="mt-3 max-w-lg text-lg text-slate-700">{APP_TAGLINE}</p>
+            <p className="mt-5 max-w-xl text-sm leading-relaxed text-slate-600">
               Predict shortages, orchestrate blood redistribution, and monitor live shipment routes across your hospital network.
             </p>
           </GlassCard>
 
           <div className="space-y-4">
-            <GlassCard className="space-y-4 border-white/20 bg-slate-950/65">
+            <GlassCard className="space-y-4 border-slate-200/90 bg-white/82">
               <h2 className="text-xl font-semibold">Hospital Login</h2>
-              <p className="text-sm text-slate-300">Enter a hospital command view and monitor your local supply chain.</p>
-              <label className="block text-xs uppercase tracking-[0.2em] text-cyan-200">Hospital</label>
-              <select
-                className="w-full rounded-xl border border-white/15 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400"
-                value={selectedHospitalId}
-                onChange={(event) => setSession({ mode: "hospital", hospitalId: event.target.value })}
-              >
-                {hospitals.map((hospital) => (
-                  <option key={hospital.id} value={hospital.id}>
-                    {hospital.name} · {hospital.city}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="w-full rounded-xl bg-gradient-to-r from-rose-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(244,63,94,0.35)] transition hover:brightness-110"
-                onClick={enterHospital}
-              >
+              <p className="text-sm text-slate-600">Enter a hospital command view and monitor your local supply chain.</p>
+              <Label className="block uppercase tracking-[0.2em] text-cyan-700">Hospital</Label>
+              <Select value={selectedHospitalId} onValueChange={(value) => setSession({ mode: "hospital", hospitalId: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select hospital" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hospitals.map((hospital) => (
+                    <SelectItem key={hospital.id} value={hospital.id}>
+                      {hospital.name} · {hospital.city}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="premium" className="w-full" onClick={enterHospital}>
                 Enter {selectedHospitalName ? `(${selectedHospitalName})` : "Hospital"}
-              </button>
+              </Button>
             </GlassCard>
 
-            <GlassCard className="space-y-4 border-white/20 bg-slate-950/65">
+            <GlassCard className="space-y-4 border-slate-200/90 bg-white/82">
               <h2 className="text-xl font-semibold">Control Tower Login</h2>
-              <p className="text-sm text-slate-300">Monitor all hospitals, active transfers, and decision-engine recommendations.</p>
-              <button
-                type="button"
-                className="w-full rounded-xl border border-cyan-300/40 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/20"
-                onClick={enterControlTower}
-              >
+              <p className="text-sm text-slate-600">Monitor all hospitals, active transfers, and decision-engine recommendations.</p>
+              <Button type="button" variant="cyan" className="w-full" onClick={enterControlTower}>
                 Enter Regional Control Tower
-              </button>
+              </Button>
             </GlassCard>
           </div>
         </motion.div>

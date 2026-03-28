@@ -1,39 +1,80 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { APP_NAME } from "@/lib/constants";
+import styles from "./AppShell.module.css";
+
+interface AppShellNavigationItem {
+  label: string;
+  href: string;
+  description?: string;
+}
 
 interface AppShellProps {
   title: string;
   subtitle?: string;
-  actions?: React.ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
+  navigation?: AppShellNavigationItem[];
   children: React.ReactNode;
 }
 
-export function AppShell({ title, subtitle, actions, children }: AppShellProps) {
+export function AppShell({ title, subtitle, actionLabel, onAction, navigation = [], children }: AppShellProps) {
+  const pathname = usePathname();
+
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(251,113,133,0.16),transparent_32%),radial-gradient(circle_at_80%_20%,_rgba(34,211,238,0.22),transparent_33%),linear-gradient(180deg,#040712_0%,#01030a_100%)]" />
-      <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.25)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.25)_1px,transparent_1px)] [background-size:36px_36px]" />
-      <header className="relative border-b border-white/10 bg-slate-950/55 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-cyan-300/80">{APP_NAME}</p>
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-            {subtitle && <p className="mt-1 text-sm text-slate-300/80">{subtitle}</p>}
+    <div className={styles.shell}>
+      <div className={styles.backgroundGrid} />
+      <div className={styles.layout}>
+        <aside className={styles.sidebar}>
+          <div className={styles.sidebarBrand}>
+            <p className={styles.sidebarEyebrow}>{APP_NAME}</p>
+            <h1 className={styles.sidebarTitle}>{title}</h1>
+            {subtitle && <p className={styles.sidebarText}>{subtitle}</p>}
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm transition hover:border-cyan-300/70 hover:text-cyan-200"
-            >
+
+          <nav className={styles.sidebarNav}>
+            {navigation.map((item) => {
+              const isActive = pathname === item.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`${styles.sidebarNavItem} ${isActive ? styles.sidebarNavItemActive : ""}`.trim()}
+                >
+                  <span className={styles.sidebarNavLabel}>{item.label}</span>
+                  {item.description && <span className={styles.sidebarNavDescription}>{item.description}</span>}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className={styles.sidebarFooter}>
+            <Link href="/" className={styles.sidebarSwitchLink}>
               Switch Account
             </Link>
-            {actions}
+            {actionLabel && onAction && (
+              <div className={styles.sidebarActionWrap}>
+                <button type="button" className={styles.sidebarActionButton} onClick={onAction}>
+                  {actionLabel}
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      </header>
-      <main className="relative mx-auto w-full max-w-7xl px-6 py-6">{children}</main>
+        </aside>
+
+        <main className={styles.mainPanel}>
+          <section className={styles.mainCard}>
+            <header className={styles.mainCardHeader}>
+              <h2 className={styles.mainCardTitle}>{title}</h2>
+              {subtitle && <p className={styles.mainCardSubtitle}>{subtitle}</p>}
+            </header>
+            <div className={styles.mainCardBody}>{children}</div>
+          </section>
+        </main>
+      </div>
     </div>
   );
 }

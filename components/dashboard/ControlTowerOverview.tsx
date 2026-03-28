@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { BLOOD_TYPE_LIST } from "@/lib/constants";
 import { formatHospitalLabel } from "@/lib/utils";
@@ -26,7 +30,7 @@ export function ControlTowerOverview({
 }: ControlTowerOverviewProps) {
   const [fromHospitalId, setFromHospitalId] = useState(hospitals[0]?.id ?? "");
   const [toHospitalId, setToHospitalId] = useState(hospitals[1]?.id ?? hospitals[0]?.id ?? "");
-  const [bloodType, setBloodType] = useState(BLOOD_TYPE_LIST[0]);
+  const [bloodType, setBloodType] = useState<Shipment["bloodType"]>(BLOOD_TYPE_LIST[0]);
   const [quantity, setQuantity] = useState(8);
   const [etaMinutes, setEtaMinutes] = useState(90);
   const [priority, setPriority] = useState<Shipment["priority"]>("high");
@@ -63,14 +67,14 @@ export function ControlTowerOverview({
           {shortageRank.map((forecast) => {
             const hospital = hospitals.find((item) => item.id === forecast.hospitalId);
             return (
-              <div key={`${forecast.hospitalId}-${forecast.bloodType}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <div key={`${forecast.hospitalId}-${forecast.bloodType}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">
                     {hospital?.name} · {forecast.bloodType}
                   </p>
                   <StatusBadge status={forecast.shortageRiskLevel} />
                 </div>
-                <p className="mt-1 text-xs text-slate-300">Risk score {Math.round(forecast.shortageRiskScore)} · Demand {forecast.predictedDemand24h}u</p>
+                <p className="mt-1 text-xs text-slate-500">Risk score {Math.round(forecast.shortageRiskScore)} · Demand {forecast.predictedDemand24h}u</p>
               </div>
             );
           })}
@@ -85,34 +89,26 @@ export function ControlTowerOverview({
             const to = hospitals.find((hospital) => hospital.id === recommendation.toHospitalId);
 
             return (
-              <div key={recommendation.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <div key={recommendation.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-sm font-medium">
                   {recommendation.bloodType} · {recommendation.suggestedQuantity}u
                 </p>
-                <p className="mt-1 text-xs text-slate-300">
+                <p className="mt-1 text-xs text-slate-500">
                   From {formatHospitalLabel(from)} to {formatHospitalLabel(to)}
                 </p>
-                <p className="mt-1 text-xs text-slate-300">
+                <p className="mt-1 text-xs text-slate-500">
                   ETA {recommendation.etaMinutes}m · Confidence {recommendation.confidenceScore}%
                 </p>
                 <div className="mt-2 flex gap-2">
                   {recommendation.status === "pending_approval" && (
-                    <button
-                      type="button"
-                      className="rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs transition hover:bg-white/20"
-                      onClick={() => onApproveRecommendation(recommendation.id)}
-                    >
+                    <Button type="button" variant="secondary" size="sm" onClick={() => onApproveRecommendation(recommendation.id)}>
                       Approve
-                    </button>
+                    </Button>
                   )}
                   {recommendation.status === "approved" && (
-                    <button
-                      type="button"
-                      className="rounded-lg border border-cyan-300/30 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 transition hover:bg-cyan-500/20"
-                      onClick={() => onDispatchRecommendation(recommendation.id)}
-                    >
+                    <Button type="button" variant="cyan" size="sm" onClick={() => onDispatchRecommendation(recommendation.id)}>
                       Dispatch
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -129,17 +125,17 @@ export function ControlTowerOverview({
             const to = hospitals.find((hospital) => hospital.id === shipment.toHospitalId);
 
             return (
-              <div key={shipment.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <div key={shipment.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">
                     {shipment.bloodType} · {shipment.quantity}u
                   </p>
                   <StatusBadge status={shipment.status} />
                 </div>
-                <p className="mt-1 text-xs text-slate-300">
+                <p className="mt-1 text-xs text-slate-500">
                   From {formatHospitalLabel(from)} to {formatHospitalLabel(to)}
                 </p>
-                <p className="mt-1 text-xs text-slate-300">
+                <p className="mt-1 text-xs text-slate-500">
                   {Math.round(shipment.progress * 100)}% progress · ETA {Math.round(shipment.etaMinutes)}m
                 </p>
               </div>
@@ -152,119 +148,141 @@ export function ControlTowerOverview({
         <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Manual Shipment Scheduler</h3>
         <p className="mt-1 text-xs text-slate-300">Create a planned or active transfer to override automation for special events.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <label className="text-xs text-slate-300">
+          <div>
+            <Label>
             From
-            <select
+            </Label>
+            <Select
               value={fromHospitalId}
-              onChange={(event) => {
-                const value = event.target.value;
+              onValueChange={(value) => {
                 setFromHospitalId(value);
                 if (value === toHospitalId) {
                   const fallback = hospitals.find((hospital) => hospital.id !== value)?.id ?? value;
                   setToHospitalId(fallback);
                 }
               }}
-              className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-1.5 text-xs"
             >
-              {hospitals.map((hospital) => (
-                <option key={hospital.id} value={hospital.id}>
-                  {hospital.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select origin" />
+              </SelectTrigger>
+              <SelectContent>
+                {hospitals.map((hospital) => (
+                  <SelectItem key={hospital.id} value={hospital.id}>
+                    {hospital.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <label className="text-xs text-slate-300">
+          <div>
+            <Label>
             To
-            <select
-              value={toHospitalId}
-              onChange={(event) => setToHospitalId(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-1.5 text-xs"
-            >
-              {destinationOptions.map((hospital) => (
-                <option key={hospital.id} value={hospital.id}>
-                  {hospital.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            </Label>
+            <Select value={toHospitalId} onValueChange={setToHospitalId}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select destination" />
+              </SelectTrigger>
+              <SelectContent>
+                {destinationOptions.map((hospital) => (
+                  <SelectItem key={hospital.id} value={hospital.id}>
+                    {hospital.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <label className="text-xs text-slate-300">
+          <div>
+            <Label>
             Blood Type
-            <select
-              value={bloodType}
-              onChange={(event) => setBloodType(event.target.value as Shipment["bloodType"])}
-              className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-1.5 text-xs"
-            >
-              {BLOOD_TYPE_LIST.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </label>
+            </Label>
+            <Select value={bloodType} onValueChange={(value) => setBloodType(value as Shipment["bloodType"])}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select blood type" />
+              </SelectTrigger>
+              <SelectContent>
+                {BLOOD_TYPE_LIST.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <label className="text-xs text-slate-300">
+          <div>
+            <Label>
             Priority
-            <select
-              value={priority}
-              onChange={(event) => setPriority(event.target.value as Shipment["priority"])}
-              className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-1.5 text-xs"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
-          </label>
+            </Label>
+            <Select value={priority} onValueChange={(value) => setPriority(value as Shipment["priority"])}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          <label className="text-xs text-slate-300">
+          <div>
+            <Label>
             Quantity
-            <input
+            </Label>
+            <Input
               type="number"
               min={1}
               max={120}
               value={quantity}
               onChange={(event) => setQuantity(Number(event.target.value))}
-              className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-1.5 text-xs"
+              className="mt-1"
             />
-          </label>
+          </div>
 
-          <label className="text-xs text-slate-300">
+          <div>
+            <Label>
             ETA (minutes)
-            <input
+            </Label>
+            <Input
               type="number"
               min={5}
               max={720}
               value={etaMinutes}
               onChange={(event) => setEtaMinutes(Number(event.target.value))}
-              className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-1.5 text-xs"
+              className="mt-1"
             />
-          </label>
+          </div>
 
-          <label className="text-xs text-slate-300">
+          <div>
+            <Label>
             Initial Status
-            <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value as ManualShipmentDraft["status"])}
-              className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-1.5 text-xs"
-            >
-              <option value="planned">Planned</option>
-              <option value="approved">Approved</option>
-              <option value="in_transit">In Transit</option>
-              <option value="delayed">Delayed</option>
-            </select>
-          </label>
+            </Label>
+            <Select value={status} onValueChange={(value) => setStatus(value as ManualShipmentDraft["status"])}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select initial status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="planned">Planned</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="in_transit">In Transit</SelectItem>
+                <SelectItem value="delayed">Delayed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="flex items-end">
-            <button
+            <Button
               type="button"
-              className="w-full rounded-lg border border-cyan-300/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100 transition hover:bg-cyan-500/20"
+              variant="cyan"
+              className="w-full"
               onClick={submitManualShipment}
               disabled={!fromHospitalId || !toHospitalId || fromHospitalId === toHospitalId}
             >
               Schedule Shipment
-            </button>
+            </Button>
           </div>
         </div>
       </GlassCard>

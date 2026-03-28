@@ -46,15 +46,15 @@ export default function ControlTowerPage() {
     <AppShell
       title="Regional Control Tower"
       subtitle="Network-wide blood supply orchestration"
-      actions={
-        <button
-          type="button"
-          className="rounded-full border border-rose-300/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-100 transition hover:bg-rose-500/20"
-          onClick={resetDemoData}
-        >
-          Reset Demo Data
-        </button>
-      }
+      navigation={[
+        {
+          label: "Control Tower",
+          href: "/control-tower",
+          description: "Network-wide operations and recommendations",
+        },
+      ]}
+      actionLabel="Reset Demo Data"
+      onAction={resetDemoData}
     >
       <div className="space-y-4">
         <KpiRibbon kpis={kpis} />
