@@ -1,8 +1,10 @@
 import { GlassCard } from "@/components/ui/GlassCard";
-import type { Forecast } from "@/types/domain";
+import { formatHospitalLabel } from "@/lib/utils";
+import type { Forecast, Hospital } from "@/types/domain";
 
 interface RiskTrendPanelProps {
   forecasts: Forecast[];
+  hospitals: Hospital[];
 }
 
 const barColor = (score: number): string => {
@@ -12,7 +14,7 @@ const barColor = (score: number): string => {
   return "bg-emerald-400";
 };
 
-export function RiskTrendPanel({ forecasts }: RiskTrendPanelProps) {
+export function RiskTrendPanel({ forecasts, hospitals }: RiskTrendPanelProps) {
   const top = [...forecasts].sort((a, b) => b.shortageRiskScore - a.shortageRiskScore).slice(0, 8);
 
   return (
@@ -23,7 +25,7 @@ export function RiskTrendPanel({ forecasts }: RiskTrendPanelProps) {
           <div key={`${forecast.hospitalId}-${forecast.bloodType}`}>
             <div className="mb-1 flex items-center justify-between text-xs text-slate-300">
               <span>
-                {forecast.hospitalId.split("-").slice(1, 2)} · {forecast.bloodType}
+                {formatHospitalLabel(hospitals.find((hospital) => hospital.id === forecast.hospitalId))} · {forecast.bloodType}
               </span>
               <span>{Math.round(forecast.shortageRiskScore)}</span>
             </div>

@@ -2,8 +2,8 @@ import { BLOOD_TYPE_LIST, DEFAULT_DEMAND_PROFILE, HOLIDAY_DEMAND_RULES, PRIORITY
 import { clamp, toRiskLevel } from "@/lib/utils";
 import type { AppState, BloodType, Forecast, Hospital, RiskByBloodType, Shipment, SimulationSettings, SystemKPI } from "@/types/domain";
 
-const ACTIVE_INBOUND = new Set(["approved", "in_transit", "delayed"]);
-const ACTIVE_OUTBOUND = new Set(["approved", "in_transit", "delayed", "planned"]);
+const PROGRESSIVE_INBOUND = new Set(["in_transit", "delayed"]);
+const ACTIVE_OUTBOUND = new Set(["approved", "planned", "in_transit", "delayed"]);
 
 const demandMultiplierByCapacity: Record<Hospital["capacityLevel"], number> = {
   low: 0.85,
@@ -12,8 +12,9 @@ const demandMultiplierByCapacity: Record<Hospital["capacityLevel"], number> = {
 };
 
 const trendFactorForCity = (city: string): number => {
-  if (city === "Nashville") return 1.2;
-  if (city === "Atlanta") return 1.1;
+  if (city === "Sofia") return 1.22;
+  if (city === "Plovdiv") return 1.1;
+  if (city === "Varna") return 1.08;
   return 1;
 };
 
@@ -57,18 +58,31 @@ const resolveHolidayMultiplier = (isoDate: string | undefined, bloodType: BloodT
   return labels.length ? { multiplier, label: labels.join(" + ") } : { multiplier };
 };
 
-const sumShipmentsFor = (
-  hospitalId: string,
-  bloodType: BloodType,
-  shipments: Shipment[],
-  direction: "in" | "out",
-): number =>
+const sumInboundUnits = (hospitalId: string, bloodType: BloodType, shipments: Shipment[]): number =>
   shipments
-    .filter((shipment) => {
-      if (shipment.bloodType !== bloodType) return false;
-      if (direction === "in") return shipment.toHospitalId === hospitalId && ACTIVE_INBOUND.has(shipment.status);
-      return shipment.fromHospitalId === hospitalId && ACTIVE_OUTBOUND.has(shipment.status);
-    })
+    .filter((shipment) => shipment.bloodType === bloodType && shipment.toHospitalId === hospitalId)
+    .reduce((sum, shipment) => {
+      if (shipment.status === "delivered") {
+        return sum + shipment.quantity * PRIORITY_WEIGHTS[shipment.priority];
+      }
+
+      if (PROGRESSIVE_INBOUND.has(shipment.status)) {
+        // Keep inbound impact conservative until units are actually received.
+        const progressWeight = clamp(shipment.progress, 0, 1) * 0.35;
+        return sum + shipment.quantity * PRIORITY_WEIGHTS[shipment.priority] * progressWeight;
+      }
+
+      return sum;
+    }, 0);
+
+const sumOutboundUnits = (hospitalId: string, bloodType: BloodType, shipments: Shipment[]): number =>
+  shipments
+    .filter(
+      (shipment) =>
+        shipment.bloodType === bloodType &&
+        shipment.fromHospitalId === hospitalId &&
+        ACTIVE_OUTBOUND.has(shipment.status),
+    )
     .reduce((sum, shipment) => sum + shipment.quantity * PRIORITY_WEIGHTS[shipment.priority], 0);
 
 export const runForecastingEngine = (
@@ -92,8 +106,8 @@ export const runForecastingEngine = (
       );
       const predictedDemand48h = Math.round(predictedDemand24h * 2.05);
 
-      const inboundUnits = sumShipmentsFor(hospital.id, bloodType, shipments, "in");
-      const outboundUnits = sumShipmentsFor(hospital.id, bloodType, shipments, "out");
+      const inboundUnits = sumInboundUnits(hospital.id, bloodType, shipments);
+      const outboundUnits = sumOutboundUnits(hospital.id, bloodType, shipments);
 
       const projected24h = currentUnits + inboundUnits - outboundUnits;
       const shortageGap = predictedDemand24h - projected24h;

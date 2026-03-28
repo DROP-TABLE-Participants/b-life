@@ -94,6 +94,16 @@ export interface TransferRecommendation {
   status: RecommendationStatus;
 }
 
+export interface ManualShipmentDraft {
+  fromHospitalId: string;
+  toHospitalId: string;
+  bloodType: BloodType;
+  quantity: number;
+  priority: PriorityLevel;
+  etaMinutes: number;
+  status: Exclude<ShipmentStatus, "delivered" | "cancelled">;
+}
+
 export interface SystemKPI {
   totalHospitals: number;
   activeShipments: number;

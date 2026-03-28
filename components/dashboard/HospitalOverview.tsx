@@ -1,27 +1,34 @@
 import { GlassCard } from "@/components/ui/GlassCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { BLOOD_TYPE_LIST } from "@/lib/constants";
+import { formatHospitalLabel } from "@/lib/utils";
 import type { Forecast, Hospital, Shipment, TransferRecommendation } from "@/types/domain";
 
 interface HospitalOverviewProps {
   hospital: Hospital;
+  hospitals: Hospital[];
   shipments: Shipment[];
   forecasts: Forecast[];
   recommendations: TransferRecommendation[];
+  currentHospitalId: string;
   onInventoryChange: (hospitalId: string, bloodType: Shipment["bloodType"], units: number) => void;
   onApproveRecommendation: (id: string) => void;
   onDispatchRecommendation: (id: string) => void;
+  onDispatchShipment: (shipmentId: string) => void;
   onReceiveShipment: (shipmentId: string) => void;
 }
 
 export function HospitalOverview({
   hospital,
+  hospitals,
   shipments,
   forecasts,
   recommendations,
+  currentHospitalId,
   onInventoryChange,
   onApproveRecommendation,
   onDispatchRecommendation,
+  onDispatchShipment,
   onReceiveShipment,
 }: HospitalOverviewProps) {
   const hospitalForecasts = forecasts.filter((forecast) => forecast.hospitalId === hospital.id);
@@ -77,28 +84,45 @@ export function HospitalOverview({
         <GlassCard>
           <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">My Active Shipments</h3>
           <div className="mt-3 space-y-2">
-            {activeShipments.slice(0, 6).map((shipment) => (
-              <div key={shipment.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium">
-                    {shipment.bloodType} · {shipment.quantity}u
+            {activeShipments.slice(0, 6).map((shipment) => {
+              const fromHospital = hospitals.find((item) => item.id === shipment.fromHospitalId);
+              const toHospital = hospitals.find((item) => item.id === shipment.toHospitalId);
+
+              return (
+                <div key={shipment.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <p className="mb-2 text-[11px] text-slate-300">
+                    From {formatHospitalLabel(fromHospital)} to {formatHospitalLabel(toHospital)}
                   </p>
-                  <StatusBadge status={shipment.status} />
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">
+                      {shipment.bloodType} · {shipment.quantity}u
+                    </p>
+                    <StatusBadge status={shipment.status} />
+                  </div>
+                  <p className="mt-1 text-xs text-slate-300">
+                    {shipment.fromHospitalId === hospital.id ? "Outgoing" : "Incoming"} · ETA {Math.round(shipment.etaMinutes)}m
+                  </p>
+                  {(shipment.status === "approved" || shipment.status === "planned") && shipment.fromHospitalId === currentHospitalId && (
+                    <button
+                      type="button"
+                      className="mt-2 rounded-lg border border-emerald-300/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 transition hover:bg-emerald-500/20"
+                      onClick={() => onDispatchShipment(shipment.id)}
+                    >
+                      Dispatch Shipment
+                    </button>
+                  )}
+                  {shipment.status !== "delivered" && shipment.toHospitalId === hospital.id && (
+                    <button
+                      type="button"
+                      className="mt-2 rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-200 transition hover:bg-cyan-500/20"
+                      onClick={() => onReceiveShipment(shipment.id)}
+                    >
+                      Mark Received
+                    </button>
+                  )}
                 </div>
-                <p className="mt-1 text-xs text-slate-300">
-                  {shipment.fromHospitalId === hospital.id ? "Outgoing" : "Incoming"} · ETA {Math.round(shipment.etaMinutes)}m
-                </p>
-                {shipment.status !== "delivered" && shipment.toHospitalId === hospital.id && (
-                  <button
-                    type="button"
-                    className="mt-2 rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-200 transition hover:bg-cyan-500/20"
-                    onClick={() => onReceiveShipment(shipment.id)}
-                  >
-                    Mark Received
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
             {activeShipments.length === 0 && <p className="text-sm text-slate-300">No active shipments.</p>}
           </div>
         </GlassCard>
@@ -116,7 +140,7 @@ export function HospitalOverview({
                 </div>
                 <p className="mt-1 text-xs text-slate-300">{recommendation.reason}</p>
                 <div className="mt-2 flex gap-2">
-                  {recommendation.status === "pending_approval" && (
+                  {recommendation.fromHospitalId === currentHospitalId && recommendation.status === "pending_approval" && (
                     <button
                       type="button"
                       className="rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs transition hover:bg-white/20"
@@ -125,7 +149,7 @@ export function HospitalOverview({
                       Approve
                     </button>
                   )}
-                  {recommendation.status === "approved" && (
+                  {recommendation.fromHospitalId === currentHospitalId && recommendation.status === "approved" && (
                     <button
                       type="button"
                       className="rounded-lg border border-rose-300/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-100 transition hover:bg-rose-500/20"

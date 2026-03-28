@@ -24,8 +24,10 @@ Open http://localhost:3000.
 1. On first load, app seeds a realistic network state in localStorage.
 2. Choose **Hospital Login** and select a hospital, or enter **Control Tower Login**.
 3. Observe live shipment progress, shortage/surplus forecasts, and transfer recommendations.
-4. Trigger recommendation approvals/dispatch and mark shipments received.
+4. Trigger recommendation approvals/dispatch, schedule manual shipments, and mark shipments received.
 5. Use **Reset Demo Data** to re-seed scenarios.
+
+Default seeded scenarios model Bulgarian hospitals (Sofia, Plovdiv, Varna, Pleven), including in-transit, delayed, and pending redistribution conditions.
 
 ## Core folders
 

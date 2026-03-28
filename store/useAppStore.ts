@@ -4,10 +4,12 @@ import { create } from "zustand";
 import { SIMULATION_BOUNDS } from "@/lib/constants";
 import { runForecastingEngine, attachForecastRisksToHospitals, computeSystemKpis } from "@/lib/forecasting";
 import { runRedistributionEngine } from "@/lib/redistribution";
-import { getAppState, resetAppState, saveAppState, seedAppStateIfEmpty } from "@/lib/storage";
+import { getAppState, resetAppState, saveAppState } from "@/lib/storage";
+import { createSeedAppState } from "@/lib/seed";
 import { lerpCoordinates } from "@/lib/utils";
 import type {
   AppState,
+  ManualShipmentDraft,
   RecommendationStatus,
   SessionState,
   Shipment,
@@ -23,8 +25,10 @@ interface AppStore extends AppState {
   setSimulationDemandMultiplier: (multiplier: number) => void;
   setSimulationShipmentSpeed: (speed: number) => void;
   updateHospitalInventory: (hospitalId: string, bloodType: Shipment["bloodType"], units: number) => void;
+  scheduleManualShipment: (draft: ManualShipmentDraft) => void;
   approveRecommendation: (recommendationId: string) => void;
   dispatchRecommendation: (recommendationId: string) => void;
+  dispatchShipment: (shipmentId: string) => void;
   markShipmentStatus: (shipmentId: string, status: ShipmentStatus) => void;
   markShipmentReceived: (shipmentId: string) => void;
   tickShipments: () => void;
@@ -77,7 +81,12 @@ const applyAndPersist = (state: AppStore, partial: Partial<AppState>): Partial<A
   return { ...merged };
 };
 
-const defaultState = synthesizeState(seedAppStateIfEmpty());
+const defaultState = synthesizeState(createSeedAppState());
+
+const generateShipmentId = (): string => {
+  const entropy = Math.random().toString(36).slice(2, 8);
+  return `ship-manual-${Date.now()}-${entropy}`;
+};
 
 export const useAppStore = create<AppStore>((set, get) => ({
   ...defaultState,
@@ -85,8 +94,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   initialize: () => {
     if (get().initialized) return;
-    const existing = getAppState() ?? seedAppStateIfEmpty();
-    const hydrated = synthesizeState(existing);
+    const existing = getAppState();
+    const seeded = existing ?? createSeedAppState();
+    if (!existing) {
+      saveAppState(seeded);
+    }
+    const hydrated = synthesizeState(seeded);
     set({ ...hydrated, initialized: true });
   },
 
@@ -144,8 +157,64 @@ export const useAppStore = create<AppStore>((set, get) => ({
     });
   },
 
+  scheduleManualShipment: (draft) => {
+    set((state) => {
+      if (draft.fromHospitalId === draft.toHospitalId) return state;
+
+      const from = state.hospitals.find((hospital) => hospital.id === draft.fromHospitalId);
+      const to = state.hospitals.find((hospital) => hospital.id === draft.toHospitalId);
+      if (!from || !to) return state;
+
+      const quantity = Math.max(1, Math.round(draft.quantity));
+      const etaMinutes = Math.max(5, Math.round(draft.etaMinutes));
+      const shouldDeductNow = draft.status === "in_transit" || draft.status === "delayed";
+
+      const hospitals = shouldDeductNow
+        ? state.hospitals.map((hospital) => {
+            if (hospital.id !== draft.fromHospitalId) return hospital;
+            const currentUnits = hospital.inventoryByBloodType[draft.bloodType] ?? 0;
+
+            return {
+              ...hospital,
+              inventoryByBloodType: {
+                ...hospital.inventoryByBloodType,
+                [draft.bloodType]: Math.max(0, currentUnits - quantity),
+              },
+              lastUpdated: new Date().toISOString(),
+            };
+          })
+        : state.hospitals;
+
+      const newShipment: Shipment = {
+        id: generateShipmentId(),
+        fromHospitalId: draft.fromHospitalId,
+        toHospitalId: draft.toHospitalId,
+        bloodType: draft.bloodType,
+        quantity,
+        status: draft.status,
+        priority: draft.priority,
+        etaMinutes,
+        progress: shouldDeductNow ? 0.04 : 0,
+        currentCoordinates: from.coordinates,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      return applyAndPersist(state, { hospitals, shipments: [newShipment, ...state.shipments] });
+    });
+  },
+
   approveRecommendation: (recommendationId) => {
     set((state) => {
+      const recommendation = state.recommendations.find((item) => item.id === recommendationId);
+      if (!recommendation) return state;
+
+      const canApprove =
+        state.session.mode === "control_tower" ||
+        (state.session.mode === "hospital" && state.session.hospitalId === recommendation.fromHospitalId);
+
+      if (!canApprove) return state;
+
       const recommendations = state.recommendations.map((recommendation) =>
         recommendation.id === recommendationId
           ? { ...recommendation, status: "approved" as RecommendationStatus }
@@ -160,6 +229,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const recommendation = state.recommendations.find((item) => item.id === recommendationId);
       if (!recommendation) return state;
 
+      const canDispatch =
+        state.session.mode === "control_tower" ||
+        (state.session.mode === "hospital" && state.session.hospitalId === recommendation.fromHospitalId);
+
+      if (!canDispatch) return state;
+
       const recommendations: TransferRecommendation[] = state.recommendations.map((item) =>
         item.id === recommendationId ? { ...item, status: "dispatched" } : item,
       );
@@ -169,8 +244,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const to = state.hospitals.find((hospital) => hospital.id === recommendation.toHospitalId);
       if (!to) return applyAndPersist(state, { recommendations });
 
+      const hospitals = state.hospitals.map((hospital) => {
+        if (hospital.id !== recommendation.fromHospitalId) return hospital;
+        const currentUnits = hospital.inventoryByBloodType[recommendation.bloodType] ?? 0;
+        return {
+          ...hospital,
+          inventoryByBloodType: {
+            ...hospital.inventoryByBloodType,
+            [recommendation.bloodType]: Math.max(0, currentUnits - recommendation.suggestedQuantity),
+          },
+          lastUpdated: new Date().toISOString(),
+        };
+      });
+
       const newShipment: Shipment = {
-        id: `ship-${Date.now()}`,
+        id: generateShipmentId(),
         fromHospitalId: recommendation.fromHospitalId,
         toHospitalId: recommendation.toHospitalId,
         bloodType: recommendation.bloodType,
@@ -184,12 +272,60 @@ export const useAppStore = create<AppStore>((set, get) => ({
         updatedAt: new Date().toISOString(),
       };
 
-      return applyAndPersist(state, { shipments: [newShipment, ...state.shipments], recommendations });
+      return applyAndPersist(state, { hospitals, shipments: [newShipment, ...state.shipments], recommendations });
+    });
+  },
+
+  dispatchShipment: (shipmentId) => {
+    set((state) => {
+      const shipment = state.shipments.find((item) => item.id === shipmentId);
+      if (!shipment) return state;
+
+      const canDispatch =
+        state.session.mode === "control_tower" ||
+        (state.session.mode === "hospital" && state.session.hospitalId === shipment.fromHospitalId);
+
+      if (!canDispatch) return state;
+      if (shipment.status === "in_transit" || shipment.status === "delivered" || shipment.status === "cancelled") {
+        return state;
+      }
+
+      const shouldDeductNow = shipment.status === "planned" || shipment.status === "approved";
+
+      const hospitals = shouldDeductNow
+        ? state.hospitals.map((hospital) => {
+            if (hospital.id !== shipment.fromHospitalId) return hospital;
+            const currentUnits = hospital.inventoryByBloodType[shipment.bloodType] ?? 0;
+
+            return {
+              ...hospital,
+              inventoryByBloodType: {
+                ...hospital.inventoryByBloodType,
+                [shipment.bloodType]: Math.max(0, currentUnits - shipment.quantity),
+              },
+              lastUpdated: new Date().toISOString(),
+            };
+          })
+        : state.hospitals;
+
+      const shipments = state.shipments.map((item) =>
+        item.id === shipmentId
+          ? {
+              ...item,
+              status: "in_transit" as ShipmentStatus,
+              progress: Math.max(0.04, item.progress),
+              updatedAt: new Date().toISOString(),
+            }
+          : item,
+      );
+
+      return applyAndPersist(state, { hospitals, shipments });
     });
   },
 
   markShipmentStatus: (shipmentId, status) => {
     set((state) => {
+      const previousShipment = state.shipments.find((shipment) => shipment.id === shipmentId);
       const shipments = state.shipments.map((shipment) =>
         shipment.id === shipmentId
           ? {
@@ -201,6 +337,29 @@ export const useAppStore = create<AppStore>((set, get) => ({
             }
           : shipment,
       );
+
+      let hospitals = state.hospitals;
+      const updatedShipment = shipments.find((shipment) => shipment.id === shipmentId);
+      const shouldCreditRecipient =
+        status === "delivered" &&
+        previousShipment?.status !== "delivered" &&
+        updatedShipment;
+
+      if (shouldCreditRecipient && updatedShipment) {
+        hospitals = state.hospitals.map((hospital) => {
+          if (hospital.id !== updatedShipment.toHospitalId) return hospital;
+          const currentUnits = hospital.inventoryByBloodType[updatedShipment.bloodType] ?? 0;
+
+          return {
+            ...hospital,
+            inventoryByBloodType: {
+              ...hospital.inventoryByBloodType,
+              [updatedShipment.bloodType]: currentUnits + updatedShipment.quantity,
+            },
+            lastUpdated: new Date().toISOString(),
+          };
+        });
+      }
 
       const recommendations = state.recommendations.map((recommendation) => {
         const matchingShipment = shipments.find(
@@ -217,7 +376,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         };
       });
 
-      return applyAndPersist(state, { shipments, recommendations });
+      return applyAndPersist(state, { hospitals, shipments, recommendations });
     });
   },
 
@@ -228,6 +387,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   tickShipments: () => {
     set((state) => {
       let hasChange = false;
+      const newlyDeliveredIds: string[] = [];
 
       const shipments = state.shipments.map((shipment) => {
         if (!["in_transit", "delayed"].includes(shipment.status)) return shipment;
@@ -241,6 +401,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
         const progress = Math.min(1, shipment.progress + speed);
         const currentCoordinates = lerpCoordinates(from.coordinates, to.coordinates, progress);
         const etaMinutes = Math.max(0, shipment.etaMinutes - (shipment.status === "delayed" ? 0.4 : 1.2) * speedScale);
+        const willBeDelivered = progress >= 1;
+
+        if (willBeDelivered) {
+          newlyDeliveredIds.push(shipment.id);
+        }
 
         hasChange = true;
 
@@ -249,13 +414,49 @@ export const useAppStore = create<AppStore>((set, get) => ({
           progress,
           currentCoordinates,
           etaMinutes,
-          status: progress >= 1 ? "delivered" : shipment.status,
+          status: willBeDelivered ? "delivered" : shipment.status,
           updatedAt: new Date().toISOString(),
         } satisfies Shipment;
       });
 
       if (!hasChange) return state;
-      return applyAndPersist(state, { shipments });
+
+      const deliveredSet = new Set(newlyDeliveredIds);
+      const hospitals = state.hospitals.map((hospital) => {
+        const deliveries = shipments.filter(
+          (shipment) =>
+            deliveredSet.has(shipment.id) &&
+            shipment.status === "delivered" &&
+            shipment.toHospitalId === hospital.id,
+        );
+        if (deliveries.length === 0) return hospital;
+
+        const nextInventory = { ...hospital.inventoryByBloodType };
+        deliveries.forEach((delivery) => {
+          nextInventory[delivery.bloodType] = (nextInventory[delivery.bloodType] ?? 0) + delivery.quantity;
+        });
+
+        return {
+          ...hospital,
+          inventoryByBloodType: nextInventory,
+          lastUpdated: new Date().toISOString(),
+        };
+      });
+
+      const recommendations = state.recommendations.map((recommendation) => {
+        const matchingDelivery = shipments.find(
+          (shipment) =>
+            deliveredSet.has(shipment.id) &&
+            shipment.fromHospitalId === recommendation.fromHospitalId &&
+            shipment.toHospitalId === recommendation.toHospitalId &&
+            shipment.bloodType === recommendation.bloodType,
+        );
+
+        if (!matchingDelivery) return recommendation;
+        return { ...recommendation, status: "fulfilled" as RecommendationStatus };
+      });
+
+      return applyAndPersist(state, { hospitals, shipments, recommendations });
     });
   },
 

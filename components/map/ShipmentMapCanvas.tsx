@@ -97,8 +97,8 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, highlighted
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: MAP_STYLE,
-      center: [-84.8, 34.6],
-      zoom: 5.1,
+      center: [25.3, 42.7],
+      zoom: 6,
       pitch: 36,
       bearing: -9,
       interactive: true,
@@ -258,7 +258,7 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, highlighted
     const hospitalById = Object.fromEntries(hospitals.map((hospital) => [hospital.id, hospital]));
 
     return (
-      <div className="relative h-[420px] w-full overflow-hidden bg-[radial-gradient(circle_at_10%_20%,rgba(34,211,238,.2),transparent_40%),radial-gradient(circle_at_80%_10%,rgba(251,113,133,.2),transparent_35%),#030712]">
+      <div className="relative h-105 w-full overflow-hidden bg-[radial-gradient(circle_at_10%_20%,rgba(34,211,238,.2),transparent_40%),radial-gradient(circle_at_80%_10%,rgba(251,113,133,.2),transparent_35%),#030712]">
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
           {shipments.map((shipment) => {
             const from = hospitalById[shipment.fromHospitalId];
@@ -315,5 +315,5 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, highlighted
     );
   }
 
-  return <div ref={mapContainerRef} className="h-[420px] w-full" aria-label="Shipment tracking map" />;
+  return <div ref={mapContainerRef} className="h-105 w-full" aria-label="Shipment tracking map" />;
 }

@@ -30,6 +30,7 @@ export default function HospitalPage() {
   const updateHospitalInventory = useAppStore((state) => state.updateHospitalInventory);
   const approveRecommendation = useAppStore((state) => state.approveRecommendation);
   const dispatchRecommendation = useAppStore((state) => state.dispatchRecommendation);
+  const dispatchShipment = useAppStore((state) => state.dispatchShipment);
   const markShipmentReceived = useAppStore((state) => state.markShipmentReceived);
   const session = useAppStore((state) => state.session);
   const setSession = useAppStore((state) => state.setSession);
@@ -75,12 +76,15 @@ export default function HospitalPage() {
         />
         <HospitalOverview
           hospital={activeHospital}
+          hospitals={hospitals}
           shipments={shipments}
           forecasts={forecasts}
           recommendations={recommendations}
+          currentHospitalId={activeHospital.id}
           onInventoryChange={updateHospitalInventory}
           onApproveRecommendation={approveRecommendation}
           onDispatchRecommendation={dispatchRecommendation}
+          onDispatchShipment={dispatchShipment}
           onReceiveShipment={markShipmentReceived}
         />
         <NetworkMapPanel

@@ -35,3 +35,8 @@ export const formatMinutes = (minutes: number): string => {
   const mins = Math.round(minutes % 60);
   return `${hours}h ${mins}m`;
 };
+
+export const formatHospitalLabel = (hospital?: { name: string; city: string } | null): string => {
+  if (!hospital) return "Unknown Hospital";
+  return `${hospital.name} (${hospital.city})`;
+};

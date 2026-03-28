@@ -27,11 +27,20 @@ export default function ControlTowerPage() {
   const resetDemoData = useAppStore((state) => state.resetDemoData);
   const approveRecommendation = useAppStore((state) => state.approveRecommendation);
   const dispatchRecommendation = useAppStore((state) => state.dispatchRecommendation);
+  const scheduleManualShipment = useAppStore((state) => state.scheduleManualShipment);
+  const session = useAppStore((state) => state.session);
+  const setSession = useAppStore((state) => state.setSession);
 
   useEffect(() => {
     const id = setInterval(() => tickShipments(), 3200);
     return () => clearInterval(id);
   }, [tickShipments]);
+
+  useEffect(() => {
+    if (session.mode !== "control_tower" || session.hospitalId !== null) {
+      setSession({ mode: "control_tower", hospitalId: null });
+    }
+  }, [session.mode, session.hospitalId, setSession]);
 
   return (
     <AppShell
@@ -61,7 +70,7 @@ export default function ControlTowerPage() {
           <NetworkMapPanel hospitals={hospitals} shipments={shipments} forecasts={forecasts} />
           <CommandCenterR3F />
         </div>
-        <RiskTrendPanel forecasts={forecasts} />
+        <RiskTrendPanel forecasts={forecasts} hospitals={hospitals} />
         <ControlTowerOverview
           hospitals={hospitals}
           forecasts={forecasts}
@@ -69,6 +78,7 @@ export default function ControlTowerPage() {
           recommendations={recommendations}
           onApproveRecommendation={approveRecommendation}
           onDispatchRecommendation={dispatchRecommendation}
+          onScheduleManualShipment={scheduleManualShipment}
         />
       </div>
     </AppShell>
