@@ -35,6 +35,7 @@ export function SimulationControlPanel({
             }}
             className="mt-2 w-full rounded-xl border border-white/20 bg-slate-950/70 px-3 py-2 text-sm outline-none focus:border-cyan-300"
           />
+          <p className="mt-2 text-xs text-slate-400">Holiday periods are modeled automatically from this date.</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-[0.25em] text-cyan-200/80">Demand Pressure ×{demandMultiplier.toFixed(2)}</p>

@@ -1,4 +1,4 @@
-import { BLOOD_TYPE_LIST, DEFAULT_DEMAND_PROFILE, PRIORITY_WEIGHTS } from "@/lib/constants";
+import { BLOOD_TYPE_LIST, DEFAULT_DEMAND_PROFILE, HOLIDAY_DEMAND_RULES, PRIORITY_WEIGHTS } from "@/lib/constants";
 import { clamp, toRiskLevel } from "@/lib/utils";
 import type { AppState, BloodType, Forecast, Hospital, RiskByBloodType, Shipment, SimulationSettings, SystemKPI } from "@/types/domain";
 
@@ -20,6 +20,41 @@ const trendFactorForCity = (city: string): number => {
 const seasonalityFactor = (isoDate?: string): number => {
   const day = new Date(isoDate ?? Date.now()).getDay();
   return day === 5 || day === 6 ? 1.08 : 1;
+};
+
+const monthDayValue = (date: Date): number => (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
+
+const parseMonthDayValue = (monthDay: string): number => {
+  const [month, day] = monthDay.split("-").map(Number);
+  return month * 100 + day;
+};
+
+const dateInRuleRange = (date: Date, start: string, end: string): boolean => {
+  const current = monthDayValue(date);
+  const startDay = parseMonthDayValue(start);
+  const endDay = parseMonthDayValue(end);
+
+  if (startDay <= endDay) return current >= startDay && current <= endDay;
+  return current >= startDay || current <= endDay;
+};
+
+const resolveHolidayMultiplier = (isoDate: string | undefined, bloodType: BloodType): { multiplier: number; label?: string } => {
+  if (!isoDate) return { multiplier: 1 };
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return { multiplier: 1 };
+
+  let multiplier = 1;
+  const labels: string[] = [];
+
+  HOLIDAY_DEMAND_RULES.forEach((rule) => {
+    if (!dateInRuleRange(date, rule.start, rule.end)) return;
+    const bloodTypeFactor = rule.bloodTypeMultipliers[bloodType];
+    if (!bloodTypeFactor || bloodTypeFactor <= 1) return;
+    multiplier *= bloodTypeFactor;
+    labels.push(rule.name);
+  });
+
+  return labels.length ? { multiplier, label: labels.join(" + ") } : { multiplier };
 };
 
 const sumShipmentsFor = (
@@ -51,7 +86,10 @@ export const runForecastingEngine = (
     return BLOOD_TYPE_LIST.map((bloodType) => {
       const currentUnits = hospital.inventoryByBloodType[bloodType] ?? 0;
       const baselineDemand = 14 * (DEFAULT_DEMAND_PROFILE[bloodType] ?? 1);
-      const predictedDemand24h = Math.round(baselineDemand * capacityDemandFactor * cityFactor * seasonalFactor * demandMultiplier);
+      const holiday = resolveHolidayMultiplier(simulation?.currentDate, bloodType);
+      const predictedDemand24h = Math.round(
+        baselineDemand * capacityDemandFactor * cityFactor * seasonalFactor * demandMultiplier * holiday.multiplier,
+      );
       const predictedDemand48h = Math.round(predictedDemand24h * 2.05);
 
       const inboundUnits = sumShipmentsFor(hospital.id, bloodType, shipments, "in");
@@ -69,6 +107,11 @@ export const runForecastingEngine = (
         `Inbound ${Math.round(inboundUnits)}u / Outbound ${Math.round(outboundUnits)}u`,
       ];
 
+      if (holiday.multiplier > 1) {
+        topFactors.push(
+          `${holiday.label ?? "Holiday demand period"} +${((holiday.multiplier - 1) * 100).toFixed(0)}%`,
+        );
+      }
       if (cityFactor > 1) {
         topFactors.push(`Regional demand multiplier ${(cityFactor * 100).toFixed(0)}%`);
       }

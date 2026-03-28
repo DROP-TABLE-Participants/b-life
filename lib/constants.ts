@@ -45,3 +45,37 @@ export const SIMULATION_BOUNDS = {
   demandMultiplier: { min: 0.6, max: 1.8, step: 0.05 },
   shipmentSpeed: { min: 0.5, max: 3, step: 0.1 },
 } as const;
+
+export interface HolidayDemandRule {
+  name: string;
+  start: string;
+  end: string;
+  bloodTypeMultipliers: Partial<Record<(typeof BLOOD_TYPES)[number], number>>;
+}
+
+export const HOLIDAY_DEMAND_RULES: HolidayDemandRule[] = [
+  {
+    name: "New Year Period",
+    start: "12-30",
+    end: "01-02",
+    bloodTypeMultipliers: { "O-": 1.22, "O+": 1.14, "A-": 1.06 },
+  },
+  {
+    name: "Independence Day Period",
+    start: "07-03",
+    end: "07-06",
+    bloodTypeMultipliers: { "O-": 1.2, "O+": 1.12, "B+": 1.08 },
+  },
+  {
+    name: "Thanksgiving Period",
+    start: "11-24",
+    end: "11-29",
+    bloodTypeMultipliers: { "O-": 1.18, "O+": 1.1, "A+": 1.07 },
+  },
+  {
+    name: "Winter Holidays",
+    start: "12-22",
+    end: "12-27",
+    bloodTypeMultipliers: { "O-": 1.2, "O+": 1.12, "AB+": 1.09 },
+  },
+];
