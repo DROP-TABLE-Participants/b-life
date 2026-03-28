@@ -26,7 +26,7 @@ export function ControlTowerOverview({
 }: ControlTowerOverviewProps) {
   const [fromHospitalId, setFromHospitalId] = useState(hospitals[0]?.id ?? "");
   const [toHospitalId, setToHospitalId] = useState(hospitals[1]?.id ?? hospitals[0]?.id ?? "");
-  const [bloodType, setBloodType] = useState(BLOOD_TYPE_LIST[0]);
+  const [bloodType, setBloodType] = useState<Shipment["bloodType"]>(BLOOD_TYPE_LIST[0]);
   const [quantity, setQuantity] = useState(8);
   const [etaMinutes, setEtaMinutes] = useState(90);
   const [priority, setPriority] = useState<Shipment["priority"]>("high");
