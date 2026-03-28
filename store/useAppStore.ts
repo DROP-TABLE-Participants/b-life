@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { SIMULATION_BOUNDS } from "@/lib/constants";
 import { runForecastingEngine, attachForecastRisksToHospitals, computeSystemKpis } from "@/lib/forecasting";
 import { runRedistributionEngine } from "@/lib/redistribution";
 import { getAppState, resetAppState, saveAppState, seedAppStateIfEmpty } from "@/lib/storage";
@@ -18,6 +19,10 @@ interface AppStore extends AppState {
   initialized: boolean;
   initialize: () => void;
   setSession: (session: SessionState) => void;
+  setSimulationDate: (isoDate: string) => void;
+  setSimulationDemandMultiplier: (multiplier: number) => void;
+  setSimulationShipmentSpeed: (speed: number) => void;
+  updateHospitalInventory: (hospitalId: string, bloodType: Shipment["bloodType"], units: number) => void;
   approveRecommendation: (recommendationId: string) => void;
   dispatchRecommendation: (recommendationId: string) => void;
   markShipmentStatus: (shipmentId: string, status: ShipmentStatus) => void;
@@ -27,7 +32,12 @@ interface AppStore extends AppState {
 }
 
 const synthesizeState = (base: AppState): AppState => {
-  const forecasts = runForecastingEngine(base.hospitals, base.shipments);
+  const simulation = base.simulation ?? {
+    currentDate: new Date().toISOString(),
+    demandMultiplier: 1,
+    shipmentSpeed: 1,
+  };
+  const forecasts = runForecastingEngine(base.hospitals, base.shipments, simulation);
   const hospitals = attachForecastRisksToHospitals(base.hospitals, forecasts);
   const recommendations = runRedistributionEngine(hospitals, forecasts).map((recommendation) => {
     const existing = base.recommendations.find((item) => item.id === recommendation.id);
@@ -36,6 +46,7 @@ const synthesizeState = (base: AppState): AppState => {
 
   const nextState: AppState = {
     ...base,
+    simulation,
     hospitals,
     forecasts,
     recommendations,
@@ -59,6 +70,7 @@ const applyAndPersist = (state: AppStore, partial: Partial<AppState>): Partial<A
     recommendations: partial.recommendations ?? state.recommendations,
     kpis: partial.kpis ?? state.kpis,
     session: partial.session ?? state.session,
+    simulation: partial.simulation ?? state.simulation ?? defaultState.simulation,
   });
 
   saveAppState(merged);
@@ -80,6 +92,56 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   setSession: (session) => {
     set((state) => applyAndPersist(state, { session }));
+  },
+
+  setSimulationDate: (isoDate) => {
+    set((state) => applyAndPersist(state, { simulation: { ...state.simulation, currentDate: isoDate } }));
+  },
+
+  setSimulationDemandMultiplier: (multiplier) => {
+    set((state) =>
+      applyAndPersist(state, {
+        simulation: {
+          ...state.simulation,
+          demandMultiplier: Math.min(
+            SIMULATION_BOUNDS.demandMultiplier.max,
+            Math.max(SIMULATION_BOUNDS.demandMultiplier.min, multiplier),
+          ),
+        },
+      }),
+    );
+  },
+
+  setSimulationShipmentSpeed: (speed) => {
+    set((state) =>
+      applyAndPersist(state, {
+        simulation: {
+          ...state.simulation,
+          shipmentSpeed: Math.min(
+            SIMULATION_BOUNDS.shipmentSpeed.max,
+            Math.max(SIMULATION_BOUNDS.shipmentSpeed.min, speed),
+          ),
+        },
+      }),
+    );
+  },
+
+  updateHospitalInventory: (hospitalId, bloodType, units) => {
+    set((state) => {
+      const hospitals = state.hospitals.map((hospital) =>
+        hospital.id === hospitalId
+          ? {
+              ...hospital,
+              inventoryByBloodType: {
+                ...hospital.inventoryByBloodType,
+                [bloodType]: Math.max(0, Math.round(units)),
+              },
+              lastUpdated: new Date().toISOString(),
+            }
+          : hospital,
+      );
+      return applyAndPersist(state, { hospitals });
+    });
   },
 
   approveRecommendation: (recommendationId) => {
@@ -174,10 +236,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
         const to = state.hospitals.find((hospital) => hospital.id === shipment.toHospitalId);
         if (!from || !to) return shipment;
 
-        const speed = shipment.status === "delayed" ? 0.004 : 0.008;
+        const speedScale = state.simulation.shipmentSpeed;
+        const speed = (shipment.status === "delayed" ? 0.004 : 0.008) * speedScale;
         const progress = Math.min(1, shipment.progress + speed);
         const currentCoordinates = lerpCoordinates(from.coordinates, to.coordinates, progress);
-        const etaMinutes = Math.max(0, shipment.etaMinutes - (shipment.status === "delayed" ? 0.4 : 1.2));
+        const etaMinutes = Math.max(0, shipment.etaMinutes - (shipment.status === "delayed" ? 0.4 : 1.2) * speedScale);
 
         hasChange = true;
 

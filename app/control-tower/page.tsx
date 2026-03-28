@@ -6,6 +6,8 @@ import { ControlTowerOverview } from "@/components/dashboard/ControlTowerOvervie
 import { KpiRibbon } from "@/components/dashboard/KpiRibbon";
 import { NetworkMapPanel } from "@/components/map/NetworkMapPanel";
 import { CommandCenterR3F } from "@/components/three/CommandCenterR3F";
+import { SimulationControlPanel } from "@/components/dashboard/SimulationControlPanel";
+import { RiskTrendPanel } from "@/components/dashboard/RiskTrendPanel";
 import { useInitializeAppState } from "@/hooks/useInitializeAppState";
 import { useAppStore } from "@/store/useAppStore";
 
@@ -18,6 +20,10 @@ export default function ControlTowerPage() {
   const forecasts = useAppStore((state) => state.forecasts);
   const recommendations = useAppStore((state) => state.recommendations);
   const kpis = useAppStore((state) => state.kpis);
+  const simulation = useAppStore((state) => state.simulation);
+  const setSimulationDate = useAppStore((state) => state.setSimulationDate);
+  const setSimulationDemandMultiplier = useAppStore((state) => state.setSimulationDemandMultiplier);
+  const setSimulationShipmentSpeed = useAppStore((state) => state.setSimulationShipmentSpeed);
   const resetDemoData = useAppStore((state) => state.resetDemoData);
   const approveRecommendation = useAppStore((state) => state.approveRecommendation);
   const dispatchRecommendation = useAppStore((state) => state.dispatchRecommendation);
@@ -43,10 +49,19 @@ export default function ControlTowerPage() {
     >
       <div className="space-y-4">
         <KpiRibbon kpis={kpis} />
+        <SimulationControlPanel
+          currentDate={simulation.currentDate}
+          demandMultiplier={simulation.demandMultiplier}
+          shipmentSpeed={simulation.shipmentSpeed}
+          onDateChange={setSimulationDate}
+          onDemandChange={setSimulationDemandMultiplier}
+          onSpeedChange={setSimulationShipmentSpeed}
+        />
         <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
           <NetworkMapPanel hospitals={hospitals} shipments={shipments} forecasts={forecasts} />
           <CommandCenterR3F />
         </div>
+        <RiskTrendPanel forecasts={forecasts} />
         <ControlTowerOverview
           hospitals={hospitals}
           forecasts={forecasts}

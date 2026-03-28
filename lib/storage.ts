@@ -10,6 +10,13 @@ const safeParse = (value: string): AppState | null => {
     if (!parsed || typeof parsed !== "object") return null;
     if (parsed.version !== APP_STATE_VERSION) return null;
     if (!Array.isArray(parsed.hospitals) || !Array.isArray(parsed.shipments)) return null;
+    if (!parsed.simulation) {
+      parsed.simulation = {
+        currentDate: new Date().toISOString(),
+        demandMultiplier: 1,
+        shipmentSpeed: 1,
+      };
+    }
     return parsed;
   } catch {
     return null;

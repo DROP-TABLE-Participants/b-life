@@ -12,9 +12,10 @@ interface AppShellProps {
 
 export function AppShell({ title, subtitle, actions, children }: AppShellProps) {
   return (
-    <div className="min-h-screen bg-[#04070f] text-slate-100">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.18),transparent_35%),radial-gradient(circle_at_80%_20%,_rgba(14,165,233,0.2),transparent_32%),linear-gradient(180deg,#04070f_0%,#02040c_100%)]" />
-      <header className="relative border-b border-white/10 backdrop-blur-xl">
+    <div className="min-h-screen bg-[#030712] text-slate-100">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(251,113,133,0.16),transparent_32%),radial-gradient(circle_at_80%_20%,_rgba(34,211,238,0.22),transparent_33%),linear-gradient(180deg,#040712_0%,#01030a_100%)]" />
+      <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.25)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.25)_1px,transparent_1px)] [background-size:36px_36px]" />
+      <header className="relative border-b border-white/10 bg-slate-950/55 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-cyan-300/80">{APP_NAME}</p>

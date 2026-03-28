@@ -48,7 +48,7 @@ export default function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55 }}
         >
-          <GlassCard className="self-start p-8 lg:p-10">
+          <GlassCard className="self-start border-white/20 bg-slate-950/60 p-8 lg:p-10">
             <p className="text-xs uppercase tracking-[0.35em] text-cyan-200/90">Regional Logistics Intelligence</p>
             <h1 className="mt-4 text-6xl font-semibold tracking-tight text-white">{APP_NAME}</h1>
             <p className="mt-3 max-w-lg text-lg text-slate-200/90">{APP_TAGLINE}</p>
@@ -58,7 +58,7 @@ export default function LandingPage() {
           </GlassCard>
 
           <div className="space-y-4">
-            <GlassCard className="space-y-4">
+            <GlassCard className="space-y-4 border-white/20 bg-slate-950/65">
               <h2 className="text-xl font-semibold">Hospital Login</h2>
               <p className="text-sm text-slate-300">Enter a hospital command view and monitor your local supply chain.</p>
               <label className="block text-xs uppercase tracking-[0.2em] text-cyan-200">Hospital</label>
@@ -82,7 +82,7 @@ export default function LandingPage() {
               </button>
             </GlassCard>
 
-            <GlassCard className="space-y-4">
+            <GlassCard className="space-y-4 border-white/20 bg-slate-950/65">
               <h2 className="text-xl font-semibold">Control Tower Login</h2>
               <p className="text-sm text-slate-300">Monitor all hospitals, active transfers, and decision-engine recommendations.</p>
               <button

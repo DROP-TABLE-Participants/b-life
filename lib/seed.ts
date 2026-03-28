@@ -198,5 +198,10 @@ export const createSeedAppState = (): AppState => {
       mode: null,
       hospitalId: null,
     },
+    simulation: {
+      currentDate: nowIso(),
+      demandMultiplier: 1,
+      shipmentSpeed: 1,
+    },
   };
 };

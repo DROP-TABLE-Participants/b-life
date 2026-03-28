@@ -8,6 +8,7 @@ interface HospitalOverviewProps {
   shipments: Shipment[];
   forecasts: Forecast[];
   recommendations: TransferRecommendation[];
+  onInventoryChange: (hospitalId: string, bloodType: Shipment["bloodType"], units: number) => void;
   onApproveRecommendation: (id: string) => void;
   onDispatchRecommendation: (id: string) => void;
   onReceiveShipment: (shipmentId: string) => void;
@@ -18,6 +19,7 @@ export function HospitalOverview({
   shipments,
   forecasts,
   recommendations,
+  onInventoryChange,
   onApproveRecommendation,
   onDispatchRecommendation,
   onReceiveShipment,
@@ -55,6 +57,17 @@ export function HospitalOverview({
                   <span className="text-xs text-slate-300">24h demand {forecast.predictedDemand24h}u</span>
                 </div>
               )}
+              <div className="mt-3">
+                <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Adjust units</label>
+                <input
+                  type="range"
+                  min={0}
+                  max={120}
+                  value={hospital.inventoryByBloodType[bloodType] ?? 0}
+                  onChange={(event) => onInventoryChange(hospital.id, bloodType, Number(event.target.value))}
+                  className="mt-1 w-full accent-cyan-400"
+                />
+              </div>
             </GlassCard>
           );
         })}

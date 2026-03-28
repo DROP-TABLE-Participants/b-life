@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { HospitalOverview } from "@/components/dashboard/HospitalOverview";
 import { NetworkMapPanel } from "@/components/map/NetworkMapPanel";
 import { KpiRibbon } from "@/components/dashboard/KpiRibbon";
+import { SimulationControlPanel } from "@/components/dashboard/SimulationControlPanel";
 import { useInitializeAppState } from "@/hooks/useInitializeAppState";
 import { useAppStore } from "@/store/useAppStore";
 
@@ -22,6 +23,11 @@ export default function HospitalPage() {
   const recommendations = useAppStore((state) => state.recommendations);
   const kpis = useAppStore((state) => state.kpis);
   const resetDemoData = useAppStore((state) => state.resetDemoData);
+  const simulation = useAppStore((state) => state.simulation);
+  const setSimulationDate = useAppStore((state) => state.setSimulationDate);
+  const setSimulationDemandMultiplier = useAppStore((state) => state.setSimulationDemandMultiplier);
+  const setSimulationShipmentSpeed = useAppStore((state) => state.setSimulationShipmentSpeed);
+  const updateHospitalInventory = useAppStore((state) => state.updateHospitalInventory);
   const approveRecommendation = useAppStore((state) => state.approveRecommendation);
   const dispatchRecommendation = useAppStore((state) => state.dispatchRecommendation);
   const markShipmentReceived = useAppStore((state) => state.markShipmentReceived);
@@ -59,11 +65,20 @@ export default function HospitalPage() {
     >
       <div className="space-y-4">
         <KpiRibbon kpis={kpis} />
+        <SimulationControlPanel
+          currentDate={simulation.currentDate}
+          demandMultiplier={simulation.demandMultiplier}
+          shipmentSpeed={simulation.shipmentSpeed}
+          onDateChange={setSimulationDate}
+          onDemandChange={setSimulationDemandMultiplier}
+          onSpeedChange={setSimulationShipmentSpeed}
+        />
         <HospitalOverview
           hospital={activeHospital}
           shipments={shipments}
           forecasts={forecasts}
           recommendations={recommendations}
+          onInventoryChange={updateHospitalInventory}
           onApproveRecommendation={approveRecommendation}
           onDispatchRecommendation={dispatchRecommendation}
           onReceiveShipment={markShipmentReceived}

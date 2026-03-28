@@ -1,6 +1,6 @@
 import { BLOOD_TYPE_LIST, DEFAULT_DEMAND_PROFILE, PRIORITY_WEIGHTS } from "@/lib/constants";
 import { clamp, toRiskLevel } from "@/lib/utils";
-import type { AppState, BloodType, Forecast, Hospital, RiskByBloodType, Shipment, SystemKPI } from "@/types/domain";
+import type { AppState, BloodType, Forecast, Hospital, RiskByBloodType, Shipment, SimulationSettings, SystemKPI } from "@/types/domain";
 
 const ACTIVE_INBOUND = new Set(["approved", "in_transit", "delayed"]);
 const ACTIVE_OUTBOUND = new Set(["approved", "in_transit", "delayed", "planned"]);
@@ -17,8 +17,8 @@ const trendFactorForCity = (city: string): number => {
   return 1;
 };
 
-const seasonalityFactor = (): number => {
-  const day = new Date().getDay();
+const seasonalityFactor = (isoDate?: string): number => {
+  const day = new Date(isoDate ?? Date.now()).getDay();
   return day === 5 || day === 6 ? 1.08 : 1;
 };
 
@@ -36,8 +36,13 @@ const sumShipmentsFor = (
     })
     .reduce((sum, shipment) => sum + shipment.quantity * PRIORITY_WEIGHTS[shipment.priority], 0);
 
-export const runForecastingEngine = (hospitals: Hospital[], shipments: Shipment[]): Forecast[] => {
-  const seasonalFactor = seasonalityFactor();
+export const runForecastingEngine = (
+  hospitals: Hospital[],
+  shipments: Shipment[],
+  simulation?: SimulationSettings,
+): Forecast[] => {
+  const seasonalFactor = seasonalityFactor(simulation?.currentDate);
+  const demandMultiplier = simulation?.demandMultiplier ?? 1;
 
   return hospitals.flatMap((hospital) => {
     const capacityDemandFactor = demandMultiplierByCapacity[hospital.capacityLevel];
@@ -46,7 +51,7 @@ export const runForecastingEngine = (hospitals: Hospital[], shipments: Shipment[
     return BLOOD_TYPE_LIST.map((bloodType) => {
       const currentUnits = hospital.inventoryByBloodType[bloodType] ?? 0;
       const baselineDemand = 14 * (DEFAULT_DEMAND_PROFILE[bloodType] ?? 1);
-      const predictedDemand24h = Math.round(baselineDemand * capacityDemandFactor * cityFactor * seasonalFactor);
+      const predictedDemand24h = Math.round(baselineDemand * capacityDemandFactor * cityFactor * seasonalFactor * demandMultiplier);
       const predictedDemand48h = Math.round(predictedDemand24h * 2.05);
 
       const inboundUnits = sumShipmentsFor(hospital.id, bloodType, shipments, "in");

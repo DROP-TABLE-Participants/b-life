@@ -40,3 +40,8 @@ export const DEFAULT_DEMAND_PROFILE: Record<string, number> = {
   "AB-": 0.65,
   "AB+": 0.7,
 };
+
+export const SIMULATION_BOUNDS = {
+  demandMultiplier: { min: 0.6, max: 1.8, step: 0.05 },
+  shipmentSpeed: { min: 0.5, max: 3, step: 0.1 },
+} as const;

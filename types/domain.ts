@@ -108,6 +108,12 @@ export interface SessionState {
   hospitalId: string | null;
 }
 
+export interface SimulationSettings {
+  currentDate: string;
+  demandMultiplier: number;
+  shipmentSpeed: number;
+}
+
 export interface AppState {
   version: string;
   seededAt: string;
@@ -118,4 +124,5 @@ export interface AppState {
   recommendations: TransferRecommendation[];
   kpis: SystemKPI;
   session: SessionState;
+  simulation: SimulationSettings;
 }
