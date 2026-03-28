@@ -32,7 +32,7 @@ _PRIVILEGED = (UserRole.institution_admin.value, UserRole.campaign_operator.valu
 
 async def _get_institution_for_user(user: User, db: AsyncSession) -> Institution:
     """Return the first institution linked to a privileged user (simplified for MVP)."""
-    result = await db.execute(select(Institution).where(Institution.verified == True).limit(1))  # noqa: E712
+    result = await db.execute(select(Institution).where(Institution.verified.is_(True)).limit(1))
     inst = result.scalar_one_or_none()
     if inst is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No verified institution found")

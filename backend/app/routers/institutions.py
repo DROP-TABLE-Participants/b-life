@@ -15,7 +15,7 @@ async def list_institutions(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[InstitutionOut]:
-    result = await db.execute(select(Institution).where(Institution.verified == True).order_by(Institution.name))  # noqa: E712
+    result = await db.execute(select(Institution).where(Institution.verified.is_(True)).order_by(Institution.name))
     return [InstitutionOut.model_validate(i) for i in result.scalars().all()]
 
 

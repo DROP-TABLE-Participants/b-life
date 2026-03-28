@@ -17,11 +17,16 @@ def _ratio_risk(available: int, demand: int) -> float:
 
 
 def _seasonal_factor(now: datetime) -> float:
-    """Summer and Christmas/New Year periods have higher demand."""
+    """
+    Additional shortage risk during high-demand / low-donation periods
+    (calibrated for Bulgaria/Eastern Europe – Northern Hemisphere).
+    Summer holidays (Jul–Aug) and Christmas/New Year (Dec–Jan) see fewer
+    blood donations while hospital demand remains steady.
+    """
     month = now.month
-    if month in (7, 8):        # Summer holiday – reduced donations
+    if month in (7, 8):        # Summer holiday – donor turnout drops
         return 0.10
-    if month in (12, 1):       # Winter holidays
+    if month in (12, 1):       # Winter holidays – reduced donation activity
         return 0.07
     return 0.0
 
