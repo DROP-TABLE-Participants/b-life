@@ -1,16 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShipmentMapCanvas } from "@/components/map/ShipmentMapCanvas";
 import { cn, formatHospitalLabel, formatMinutes } from "@/lib/utils";
-import { BLOOD_TYPE_LIST } from "@/lib/constants";
-import type { Forecast, Hospital, ManualShipmentDraft, Shipment, SystemKPI, TransferRecommendation } from "@/types/domain";
+import type { Forecast, Hospital, Shipment, SystemKPI, TransferRecommendation } from "@/types/domain";
 import surfaceStyles from "./DashboardCardSurface.module.css";
 import styles from "./ControlTowerDashboardView.module.css";
 
@@ -40,7 +36,6 @@ interface ControlTowerDashboardViewProps {
   kpis: SystemKPI;
   onApproveRecommendation: (id: string) => void;
   onDispatchRecommendation: (id: string) => void;
-  onScheduleManualShipment: (draft: ManualShipmentDraft) => void;
   onResetDemoData: () => void;
 }
 
@@ -52,17 +47,8 @@ export function ControlTowerDashboardView({
   kpis,
   onApproveRecommendation,
   onDispatchRecommendation,
-  onScheduleManualShipment,
   onResetDemoData,
 }: ControlTowerDashboardViewProps) {
-  const [fromHospitalId, setFromHospitalId] = useState(hospitals[0]?.id ?? "");
-  const [toHospitalId, setToHospitalId] = useState(hospitals[1]?.id ?? hospitals[0]?.id ?? "");
-  const [bloodType, setBloodType] = useState<Shipment["bloodType"]>(BLOOD_TYPE_LIST[0]);
-  const [quantity, setQuantity] = useState(8);
-  const [etaMinutes, setEtaMinutes] = useState(90);
-  const [priority, setPriority] = useState<Shipment["priority"]>("high");
-  const [status, setStatus] = useState<ManualShipmentDraft["status"]>("planned");
-
   const topShortages = useMemo(
     () => [...forecasts].sort((a, b) => b.shortageRiskScore - a.shortageRiskScore).slice(0, 6),
     [forecasts],
@@ -77,25 +63,6 @@ export function ControlTowerDashboardView({
     () => shipments.filter((item) => item.status !== "delivered" && item.status !== "cancelled").slice(0, 8),
     [shipments],
   );
-
-  const destinationOptions = useMemo(
-    () => hospitals.filter((hospital) => hospital.id !== fromHospitalId),
-    [fromHospitalId, hospitals],
-  );
-
-  const submitManualShipment = () => {
-    if (!fromHospitalId || !toHospitalId || fromHospitalId === toHospitalId) return;
-
-    onScheduleManualShipment({
-      fromHospitalId,
-      toHospitalId,
-      bloodType,
-      quantity,
-      etaMinutes,
-      priority,
-      status,
-    });
-  };
 
   return (
     <div className={styles.controlTowerDashboard}>
@@ -136,7 +103,7 @@ export function ControlTowerDashboardView({
         </Card>
       </section>
 
-      <section className={`${styles.controlTowerDashboardSection} ${styles.controlTowerDashboardMiddleRow}`}>
+      <section className={styles.controlTowerDashboardSection}>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
           <CardHeader className={styles.controlTowerDashboardCardHeader}>
             <CardTitle className={styles.controlTowerDashboardCardTitle}>Risk Heatmap</CardTitle>
@@ -150,6 +117,37 @@ export function ControlTowerDashboardView({
               mode="riskHeatmap"
             />
           </div>
+        </Card>
+      </section>
+
+      <section className={`${styles.controlTowerDashboardSection} ${styles.controlTowerDashboardMiddleRow}`}>
+        <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
+          <CardHeader className={styles.controlTowerDashboardCardHeader}>
+            <CardTitle className={styles.controlTowerDashboardCardTitle}>Critical Shortage Ranking</CardTitle>
+          </CardHeader>
+          <CardContent className={styles.controlTowerDashboardCardBody}>
+            <div className={styles.controlTowerDashboardList}>
+              {topShortages.map((forecast) => {
+                const hospital = hospitals.find((item) => item.id === forecast.hospitalId);
+                return (
+                  <div key={`${forecast.hospitalId}-${forecast.bloodType}`} className={styles.controlTowerDashboardListItem}>
+                    <div className={styles.controlTowerDashboardListItemRow}>
+                      <p className={styles.controlTowerDashboardListItemTitle}>
+                        {hospital?.name} · {forecast.bloodType}
+                      </p>
+                      <Badge variant="outline" className={cn(urgencyBadgeClassNames[forecast.shortageRiskLevel === "critical" ? "critical" : forecast.shortageRiskLevel === "high" ? "high" : "elevated"])}>
+                        {forecast.shortageRiskLevel === "safe" ? "safe" : forecast.shortageRiskLevel === "elevated" ? "warning" : "risk"}
+                      </Badge>
+                    </div>
+                    <p className={styles.controlTowerDashboardListItemText}>
+                      Risk score {Math.round(forecast.shortageRiskScore)} · Demand {forecast.predictedDemand24h}u
+                    </p>
+                    <p className={styles.controlTowerDashboardListItemText}>{formatHospitalLabel(hospital)}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
         </Card>
 
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
@@ -202,156 +200,6 @@ export function ControlTowerDashboardView({
                   </div>
                 );
               })}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className={`${styles.controlTowerDashboardSection} ${styles.controlTowerDashboardBottomRow}`}>
-        <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
-          <CardHeader className={styles.controlTowerDashboardCardHeader}>
-            <CardTitle className={styles.controlTowerDashboardCardTitle}>Critical Shortage Ranking</CardTitle>
-          </CardHeader>
-          <CardContent className={styles.controlTowerDashboardCardBody}>
-            <div className={styles.controlTowerDashboardList}>
-              {topShortages.map((forecast) => {
-                const hospital = hospitals.find((item) => item.id === forecast.hospitalId);
-                return (
-                  <div key={`${forecast.hospitalId}-${forecast.bloodType}`} className={styles.controlTowerDashboardListItem}>
-                    <div className={styles.controlTowerDashboardListItemRow}>
-                      <p className={styles.controlTowerDashboardListItemTitle}>
-                        {hospital?.name} · {forecast.bloodType}
-                      </p>
-                      <Badge variant="outline" className={cn(urgencyBadgeClassNames[forecast.shortageRiskLevel === "critical" ? "critical" : forecast.shortageRiskLevel === "high" ? "high" : "elevated"])}>
-                        {forecast.shortageRiskLevel === "safe" ? "safe" : forecast.shortageRiskLevel === "elevated" ? "warning" : "risk"}
-                      </Badge>
-                    </div>
-                    <p className={styles.controlTowerDashboardListItemText}>
-                      Risk score {Math.round(forecast.shortageRiskScore)} · Demand {forecast.predictedDemand24h}u
-                    </p>
-                    <p className={styles.controlTowerDashboardListItemText}>{formatHospitalLabel(hospital)}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
-          <CardHeader className={styles.controlTowerDashboardCardHeader}>
-            <CardTitle className={styles.controlTowerDashboardCardTitle}>Manual Shipment Scheduler</CardTitle>
-          </CardHeader>
-          <CardContent className={styles.controlTowerDashboardCardBody}>
-            <div className={styles.controlTowerDashboardFormGrid}>
-              <div className={styles.controlTowerDashboardField}>
-                <Label>From</Label>
-                <Select
-                  value={fromHospitalId}
-                  onValueChange={(value) => {
-                    setFromHospitalId(value);
-                    if (value === toHospitalId) {
-                      const fallback = hospitals.find((hospital) => hospital.id !== value)?.id ?? value;
-                      setToHospitalId(fallback);
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select origin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {hospitals.map((hospital) => (
-                      <SelectItem key={hospital.id} value={hospital.id}>
-                        {hospital.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className={styles.controlTowerDashboardField}>
-                <Label>To</Label>
-                <Select value={toHospitalId} onValueChange={setToHospitalId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select destination" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {destinationOptions.map((hospital) => (
-                      <SelectItem key={hospital.id} value={hospital.id}>
-                        {hospital.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className={styles.controlTowerDashboardField}>
-                <Label>Blood Type</Label>
-                <Select value={bloodType} onValueChange={(value) => setBloodType(value as Shipment["bloodType"])}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select blood type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BLOOD_TYPE_LIST.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className={styles.controlTowerDashboardField}>
-                <Label>Priority</Label>
-                <Select value={priority} onValueChange={(value) => setPriority(value as Shipment["priority"])}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className={styles.controlTowerDashboardField}>
-                <Label>Quantity</Label>
-                <Input type="number" min={1} max={120} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} />
-              </div>
-
-              <div className={styles.controlTowerDashboardField}>
-                <Label>ETA (minutes)</Label>
-                <Input type="number" min={5} max={720} value={etaMinutes} onChange={(event) => setEtaMinutes(Number(event.target.value))} />
-              </div>
-
-              <div className={styles.controlTowerDashboardField}>
-                <Label>Initial Status</Label>
-                <Select value={status} onValueChange={(value) => setStatus(value as ManualShipmentDraft["status"])}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="planned">Planned</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="in_transit">In Transit</SelectItem>
-                    <SelectItem value="delayed">Delayed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className={styles.controlTowerDashboardField}>
-                <Label>&nbsp;</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={styles.controlTowerDashboardSubmitButton}
-                  onClick={submitManualShipment}
-                  disabled={!fromHospitalId || !toHospitalId || fromHospitalId === toHospitalId}
-                >
-                  Schedule Shipment
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
