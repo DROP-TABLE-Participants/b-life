@@ -18,6 +18,7 @@ export default function ControlTowerPage() {
   const resetDemoData = useAppStore((state) => state.resetDemoData);
   const approveRecommendation = useAppStore((state) => state.approveRecommendation);
   const dispatchRecommendation = useAppStore((state) => state.dispatchRecommendation);
+  const scheduleManualShipment = useAppStore((state) => state.scheduleManualShipment);
   const session = useAppStore((state) => state.session);
   const setSession = useAppStore((state) => state.setSession);
 
@@ -56,6 +57,7 @@ export default function ControlTowerPage() {
         kpis={kpis}
         onApproveRecommendation={approveRecommendation}
         onDispatchRecommendation={dispatchRecommendation}
+        onScheduleManualShipment={scheduleManualShipment}
         onResetDemoData={resetDemoData}
       />
     </MainView>

@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShipmentMapCanvas } from "@/components/map/ShipmentMapCanvas";
-import { cn } from "@/lib/utils";
+import { cn, formatHospitalLabel } from "@/lib/utils";
 import { BLOOD_TYPES, type Forecast, type Hospital, type Shipment, type TransferRecommendation } from "@/types/domain";
 import surfaceStyles from "./DashboardCardSurface.module.css";
 import styles from "./HospitalDashboardView.module.css";
@@ -41,6 +41,8 @@ interface HospitalDashboardViewProps {
   currentHospitalId: string;
   onApproveRecommendation: (id: string) => void;
   onDispatchRecommendation: (id: string) => void;
+  onDispatchShipment: (shipmentId: string) => void;
+  onReceiveShipment: (shipmentId: string) => void;
 }
 
 export function HospitalDashboardView({
@@ -52,6 +54,8 @@ export function HospitalDashboardView({
   currentHospitalId,
   onApproveRecommendation,
   onDispatchRecommendation,
+  onDispatchShipment,
+  onReceiveShipment,
 }: HospitalDashboardViewProps) {
   const [selectedForecast, setSelectedForecast] = useState<(typeof FORECAST_OPTIONS)[number]>("all");
   const [selectedBloodType, setSelectedBloodType] = useState<(typeof BLOOD_TYPES)[number] | null>(null);
@@ -93,6 +97,10 @@ export function HospitalDashboardView({
     (shipment) =>
       shipment.fromHospitalId === hospital.id ||
       shipment.toHospitalId === hospital.id,
+  );
+
+  const activeShipments = dispatchShipments.filter(
+    (shipment) => shipment.status !== "delivered" && shipment.status !== "cancelled",
   );
 
   return (
@@ -198,6 +206,67 @@ export function HospitalDashboardView({
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className={styles.hospitalDashboardSection}>
+        <Card className={cn(surfaceStyles.dashboardCardSurface, styles.hospitalDashboardCard)}>
+          <CardHeader className={styles.hospitalDashboardCardHeader}>
+            <CardTitle className={styles.hospitalDashboardCardTitle}>My Active Shipments</CardTitle>
+          </CardHeader>
+          <CardContent className={styles.hospitalDashboardCardBody}>
+            <div className={styles.hospitalDashboardTransfers}>
+              {activeShipments.slice(0, 8).map((shipment) => {
+                const from = hospitals.find((item) => item.id === shipment.fromHospitalId);
+                const to = hospitals.find((item) => item.id === shipment.toHospitalId);
+
+                return (
+                  <div key={shipment.id} className={styles.hospitalDashboardTransferItem}>
+                    <div className={styles.hospitalDashboardTransferTitleRow}>
+                      <p className={styles.hospitalDashboardTransferTitle}>
+                        {shipment.bloodType} · {shipment.quantity}u
+                      </p>
+                      <Badge variant="outline">{shipment.status.replaceAll("_", " ")}</Badge>
+                    </div>
+                    <p className={styles.hospitalDashboardTransferText}>
+                      From {formatHospitalLabel(from)} to {formatHospitalLabel(to)}
+                    </p>
+                    <p className={styles.hospitalDashboardTransferText}>
+                      {shipment.fromHospitalId === hospital.id ? "Outgoing" : "Incoming"} · ETA {Math.round(shipment.etaMinutes)}m
+                    </p>
+                    <div className={styles.hospitalDashboardTransferActions}>
+                      {(shipment.status === "planned" || shipment.status === "approved") &&
+                        shipment.fromHospitalId === currentHospitalId && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={styles.hospitalDashboardButton}
+                            onClick={() => onDispatchShipment(shipment.id)}
+                          >
+                            Dispatch Shipment
+                          </Button>
+                        )}
+                      {shipment.toHospitalId === currentHospitalId && shipment.status !== "delivered" && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className={styles.hospitalDashboardButton}
+                          onClick={() => onReceiveShipment(shipment.id)}
+                        >
+                          Mark Received
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {activeShipments.length === 0 ? (
+                <p className={styles.hospitalDashboardTransferText}>No active shipments.</p>
+              ) : null}
             </div>
           </CardContent>
         </Card>

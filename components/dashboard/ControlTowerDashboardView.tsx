@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShipmentMapCanvas } from "@/components/map/ShipmentMapCanvas";
+import { BLOOD_TYPE_LIST } from "@/lib/constants";
 import { cn, formatHospitalLabel, formatMinutes } from "@/lib/utils";
-import type { Forecast, Hospital, Shipment, SystemKPI, TransferRecommendation } from "@/types/domain";
+import type { Forecast, Hospital, ManualShipmentDraft, Shipment, SystemKPI, TransferRecommendation } from "@/types/domain";
 import surfaceStyles from "./DashboardCardSurface.module.css";
 import styles from "./ControlTowerDashboardView.module.css";
 
@@ -36,6 +37,7 @@ interface ControlTowerDashboardViewProps {
   kpis: SystemKPI;
   onApproveRecommendation: (id: string) => void;
   onDispatchRecommendation: (id: string) => void;
+  onScheduleManualShipment: (draft: ManualShipmentDraft) => void;
   onResetDemoData: () => void;
 }
 
@@ -47,8 +49,17 @@ export function ControlTowerDashboardView({
   kpis,
   onApproveRecommendation,
   onDispatchRecommendation,
+  onScheduleManualShipment,
   onResetDemoData,
 }: ControlTowerDashboardViewProps) {
+  const [fromHospitalId, setFromHospitalId] = useState(hospitals[0]?.id ?? "");
+  const [toHospitalId, setToHospitalId] = useState(hospitals[1]?.id ?? hospitals[0]?.id ?? "");
+  const [bloodType, setBloodType] = useState<Shipment["bloodType"]>(BLOOD_TYPE_LIST[0]);
+  const [quantity, setQuantity] = useState(8);
+  const [etaMinutes, setEtaMinutes] = useState(90);
+  const [priority, setPriority] = useState<Shipment["priority"]>("high");
+  const [status, setStatus] = useState<ManualShipmentDraft["status"]>("planned");
+
   const topShortages = useMemo(
     () => [...forecasts].sort((a, b) => b.shortageRiskScore - a.shortageRiskScore).slice(0, 6),
     [forecasts],
@@ -63,6 +74,25 @@ export function ControlTowerDashboardView({
     () => shipments.filter((item) => item.status !== "delivered" && item.status !== "cancelled").slice(0, 8),
     [shipments],
   );
+
+  const destinationOptions = useMemo(
+    () => hospitals.filter((hospital) => hospital.id !== fromHospitalId),
+    [fromHospitalId, hospitals],
+  );
+
+  const submitManualShipment = () => {
+    if (!fromHospitalId || !toHospitalId || fromHospitalId === toHospitalId) return;
+
+    onScheduleManualShipment({
+      fromHospitalId,
+      toHospitalId,
+      bloodType,
+      quantity,
+      etaMinutes,
+      priority,
+      status,
+    });
+  };
 
   return (
     <div className={styles.controlTowerDashboard}>
@@ -235,6 +265,133 @@ export function ControlTowerDashboardView({
                   </div>
                 );
               })}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className={styles.controlTowerDashboardSection}>
+        <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
+          <CardHeader className={styles.controlTowerDashboardCardHeader}>
+            <CardTitle className={styles.controlTowerDashboardCardTitle}>Manual Shipment Scheduler</CardTitle>
+          </CardHeader>
+          <CardContent className={styles.controlTowerDashboardCardBody}>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <label className="text-xs uppercase tracking-[0.2em] text-cyan-200">
+                From
+                <select
+                  value={fromHospitalId}
+                  onChange={(event) => {
+                    const nextFrom = event.target.value;
+                    setFromHospitalId(nextFrom);
+                    if (nextFrom === toHospitalId) {
+                      const fallback = hospitals.find((hospital) => hospital.id !== nextFrom)?.id ?? nextFrom;
+                      setToHospitalId(fallback);
+                    }
+                  }}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-2 text-sm text-white"
+                >
+                  {hospitals.map((hospital) => (
+                    <option key={hospital.id} value={hospital.id}>
+                      {hospital.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-xs uppercase tracking-[0.2em] text-cyan-200">
+                To
+                <select
+                  value={toHospitalId}
+                  onChange={(event) => setToHospitalId(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-2 text-sm text-white"
+                >
+                  {destinationOptions.map((hospital) => (
+                    <option key={hospital.id} value={hospital.id}>
+                      {hospital.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-xs uppercase tracking-[0.2em] text-cyan-200">
+                Blood Type
+                <select
+                  value={bloodType}
+                  onChange={(event) => setBloodType(event.target.value as Shipment["bloodType"])}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-2 text-sm text-white"
+                >
+                  {BLOOD_TYPE_LIST.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-xs uppercase tracking-[0.2em] text-cyan-200">
+                Priority
+                <select
+                  value={priority}
+                  onChange={(event) => setPriority(event.target.value as Shipment["priority"])}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-2 text-sm text-white"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </label>
+
+              <label className="text-xs uppercase tracking-[0.2em] text-cyan-200">
+                Quantity
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={quantity}
+                  onChange={(event) => setQuantity(Number(event.target.value))}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-2 text-sm text-white"
+                />
+              </label>
+
+              <label className="text-xs uppercase tracking-[0.2em] text-cyan-200">
+                ETA (minutes)
+                <input
+                  type="number"
+                  min={5}
+                  max={720}
+                  value={etaMinutes}
+                  onChange={(event) => setEtaMinutes(Number(event.target.value))}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-2 text-sm text-white"
+                />
+              </label>
+
+              <label className="text-xs uppercase tracking-[0.2em] text-cyan-200">
+                Initial Status
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value as ManualShipmentDraft["status"])}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-slate-950/70 px-2 py-2 text-sm text-white"
+                >
+                  <option value="planned">Planned</option>
+                  <option value="approved">Approved</option>
+                  <option value="in_transit">In Transit</option>
+                  <option value="delayed">Delayed</option>
+                </select>
+              </label>
+
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={submitManualShipment}
+                  disabled={!fromHospitalId || !toHospitalId || fromHospitalId === toHospitalId}
+                >
+                  Schedule Shipment
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

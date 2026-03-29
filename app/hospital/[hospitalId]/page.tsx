@@ -20,6 +20,8 @@ export default function HospitalPage() {
   const recommendations = useAppStore((state) => state.recommendations);
   const approveRecommendation = useAppStore((state) => state.approveRecommendation);
   const dispatchRecommendation = useAppStore((state) => state.dispatchRecommendation);
+  const dispatchShipment = useAppStore((state) => state.dispatchShipment);
+  const markShipmentReceived = useAppStore((state) => state.markShipmentReceived);
   const session = useAppStore((state) => state.session);
   const setSession = useAppStore((state) => state.setSession);
 
@@ -29,14 +31,21 @@ export default function HospitalPage() {
   }, [tickShipments]);
 
   useEffect(() => {
-    if (routeHospitalId && session.hospitalId !== routeHospitalId) {
+    if (routeHospitalId && (session.mode !== "hospital" || session.hospitalId !== routeHospitalId)) {
       setSession({ mode: "hospital", hospitalId: routeHospitalId });
     }
-  }, [routeHospitalId, session.hospitalId, setSession]);
+  }, [routeHospitalId, session.mode, session.hospitalId, setSession]);
 
   const activeHospital = hospitals.find((hospital) => hospital.id === routeHospitalId) ?? hospitals[0];
 
   if (!activeHospital) return null;
+
+  const runAsActiveHospital = (fn: () => void) => {
+    if (session.mode !== "hospital" || session.hospitalId !== activeHospital.id) {
+      setSession({ mode: "hospital", hospitalId: activeHospital.id });
+    }
+    fn();
+  };
 
   return (
     <MainView
@@ -66,8 +75,14 @@ export default function HospitalPage() {
           forecasts={forecasts}
           recommendations={recommendations}
           currentHospitalId={activeHospital.id}
-          onApproveRecommendation={approveRecommendation}
-          onDispatchRecommendation={dispatchRecommendation}
+          onApproveRecommendation={(recommendationId) =>
+            runAsActiveHospital(() => approveRecommendation(recommendationId))
+          }
+          onDispatchRecommendation={(recommendationId) =>
+            runAsActiveHospital(() => dispatchRecommendation(recommendationId))
+          }
+          onDispatchShipment={(shipmentId) => runAsActiveHospital(() => dispatchShipment(shipmentId))}
+          onReceiveShipment={(shipmentId) => runAsActiveHospital(() => markShipmentReceived(shipmentId))}
         />
     </MainView>
   );

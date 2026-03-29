@@ -90,7 +90,7 @@ export const runRedistributionEngine = (hospitals: Hospital[], forecasts: Foreca
       distanceKm: Number(selected.distanceKm.toFixed(1)),
       etaMinutes,
       confidenceScore: Math.min(98, Math.round((needForecast.shortageRiskScore + selected.candidate.surplusRiskScore) / 2)),
-      status: recommendations.length === 0 ? "pending_approval" : "approved",
+      status: "pending_approval",
     });
   });
 
