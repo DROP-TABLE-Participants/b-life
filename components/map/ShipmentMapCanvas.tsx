@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import MapView, {
   Layer,
@@ -11,6 +11,13 @@ import MapView, {
   type MapRef,
 } from "react-map-gl/mapbox";
 import type { MapboxGeoJSONFeature } from "mapbox-gl";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { formatHospitalLabel, formatMinutes } from "@/lib/utils";
 import type { Forecast, Hospital, Shipment } from "@/types/domain";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -24,11 +31,18 @@ interface ShipmentMapCanvasProps {
   mode?: "base" | "riskHeatmap";
 }
 
-const INITIAL_VIEW_STATE = {
+const DEFAULT_VIEW_STATE = {
   longitude: 23.3219,
   latitude: 42.6977,
   zoom: 10.5,
 };
+
+const BULGARIA_BOUNDS: [[number, number], [number, number]] = [
+  [22.360344, 41.339032],
+  [28.57904, 44.215343],
+];
+
+const HOSPITAL_VIEW_ZOOM = 9.8;
 
 const heatmapLayer: LayerProps = {
   id: "hospital-risk-heatmap",
@@ -269,6 +283,56 @@ type InteractiveMapMouseEvent = MapMouseEvent & {
   features?: MapboxGeoJSONFeature[];
 };
 
+const createRoutePairKey = (fromHospitalId: string, toHospitalId: string): string =>
+  `${fromHospitalId}->${toHospitalId}`;
+
+const coordinateDistance = (from: [number, number], to: [number, number]): number => {
+  const deltaLng = to[0] - from[0];
+  const deltaLat = to[1] - from[1];
+  return Math.hypot(deltaLng, deltaLat);
+};
+
+const interpolateOnRoute = (routeCoordinates: [number, number][], progress: number): [number, number] => {
+  if (routeCoordinates.length === 0) return [DEFAULT_VIEW_STATE.longitude, DEFAULT_VIEW_STATE.latitude];
+  if (routeCoordinates.length === 1) return routeCoordinates[0];
+
+  const clampedProgress = Math.max(0, Math.min(1, progress));
+  if (clampedProgress === 0) return routeCoordinates[0];
+  if (clampedProgress === 1) return routeCoordinates[routeCoordinates.length - 1];
+
+  const segmentLengths = routeCoordinates
+    .slice(0, -1)
+    .map((point, index) => coordinateDistance(point, routeCoordinates[index + 1]));
+  const totalLength = segmentLengths.reduce((sum, length) => sum + length, 0);
+
+  if (totalLength <= 0) {
+    return routeCoordinates[0];
+  }
+
+  const targetLength = totalLength * clampedProgress;
+  let traversedLength = 0;
+
+  for (let index = 0; index < segmentLengths.length; index += 1) {
+    const segmentLength = segmentLengths[index];
+    const nextTraversedLength = traversedLength + segmentLength;
+
+    if (targetLength <= nextTraversedLength || index === segmentLengths.length - 1) {
+      const localProgress = segmentLength === 0 ? 0 : (targetLength - traversedLength) / segmentLength;
+      const from = routeCoordinates[index];
+      const to = routeCoordinates[index + 1];
+
+      return [
+        from[0] + (to[0] - from[0]) * localProgress,
+        from[1] + (to[1] - from[1]) * localProgress,
+      ];
+    }
+
+    traversedLength = nextTraversedLength;
+  }
+
+  return routeCoordinates[routeCoordinates.length - 1];
+};
+
 export function ShipmentMapCanvas({
   hospitals,
   shipments,
@@ -278,13 +342,45 @@ export function ShipmentMapCanvas({
   mode = "base",
 }: ShipmentMapCanvasProps) {
   const mapRef = useRef<MapRef | null>(null);
+  const lastContextKeyRef = useRef<string | null>(null);
+
+  const highlightedHospitalCoordinates = useMemo<[number, number] | null>(() => {
+    if (!highlightedHospitalId) return null;
+    const hospital = hospitals.find((item) => item.id === highlightedHospitalId);
+    return hospital?.coordinates ?? null;
+  }, [highlightedHospitalId, hospitals]);
+
+  const highlightedHospitalLongitude = highlightedHospitalCoordinates?.[0] ?? null;
+  const highlightedHospitalLatitude = highlightedHospitalCoordinates?.[1] ?? null;
+
+  const initialViewState = useMemo(() => {
+    if (mode === "riskHeatmap") {
+      return {
+        longitude: (BULGARIA_BOUNDS[0][0] + BULGARIA_BOUNDS[1][0]) / 2,
+        latitude: (BULGARIA_BOUNDS[0][1] + BULGARIA_BOUNDS[1][1]) / 2,
+        zoom: 6.5,
+      };
+    }
+
+    if (highlightedHospitalCoordinates) {
+      return {
+        longitude: highlightedHospitalCoordinates[0],
+        latitude: highlightedHospitalCoordinates[1],
+        zoom: HOSPITAL_VIEW_ZOOM,
+      };
+    }
+
+    return DEFAULT_VIEW_STATE;
+  }, [highlightedHospitalCoordinates, mode]);
+
   const [center, setCenter] = useState<[number, number]>([
-    INITIAL_VIEW_STATE.longitude,
-    INITIAL_VIEW_STATE.latitude,
+    initialViewState.longitude,
+    initialViewState.latitude,
   ]);
-  const [zoom, setZoom] = useState(INITIAL_VIEW_STATE.zoom);
+  const [zoom, setZoom] = useState(initialViewState.zoom);
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(highlightedHospitalId ?? null);
   const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
+  const [routeCoordinatesByPair, setRouteCoordinatesByPair] = useState<Record<string, [number, number][]>>({});
 
   const hospitalsById = useMemo(() => {
     return new Map(hospitals.map((hospital) => [hospital.id, hospital]));
@@ -300,6 +396,81 @@ export function ShipmentMapCanvas({
   const activeScopedShipments = useMemo(() => {
     return scopedShipments.filter((shipment) => shipment.status !== "delivered" && shipment.status !== "cancelled");
   }, [scopedShipments]);
+
+  const scopedRoutePairs = useMemo(() => {
+    const seen = new Set<string>();
+    const pairs: Array<{ routePairKey: string; from: [number, number]; to: [number, number] }> = [];
+
+    for (const shipment of scopedShipments) {
+      const from = hospitalsById.get(shipment.fromHospitalId);
+      const to = hospitalsById.get(shipment.toHospitalId);
+      if (!from || !to) continue;
+
+      const routePairKey = createRoutePairKey(shipment.fromHospitalId, shipment.toHospitalId);
+      if (seen.has(routePairKey)) continue;
+
+      seen.add(routePairKey);
+      pairs.push({
+        routePairKey,
+        from: from.coordinates,
+        to: to.coordinates,
+      });
+    }
+
+    return pairs;
+  }, [hospitalsById, scopedShipments]);
+
+  useEffect(() => {
+    if (mode !== "base" || !mapboxToken) return;
+
+    const missingPairs = scopedRoutePairs.filter((pair) => !routeCoordinatesByPair[pair.routePairKey]);
+    if (missingPairs.length === 0) return;
+
+    let isCancelled = false;
+
+    const fetchRoutes = async () => {
+      const fetchedRoutes: Record<string, [number, number][]> = {};
+
+      await Promise.all(
+        missingPairs.map(async (pair) => {
+          const [fromLng, fromLat] = pair.from;
+          const [toLng, toLat] = pair.to;
+          const url =
+            `https://api.mapbox.com/directions/v5/mapbox/driving/` +
+            `${fromLng},${fromLat};${toLng},${toLat}` +
+            `?geometries=geojson&overview=full&access_token=${mapboxToken}`;
+
+          try {
+            const response = await fetch(url);
+            if (!response.ok) return;
+
+            const payload = (await response.json()) as {
+              routes?: Array<{ geometry?: { coordinates?: number[][] } }>;
+            };
+
+            const routeCoordinates = payload.routes?.[0]?.geometry?.coordinates;
+            if (!routeCoordinates || routeCoordinates.length < 2) return;
+
+            fetchedRoutes[pair.routePairKey] = routeCoordinates
+              .filter((coordinate): coordinate is number[] => Array.isArray(coordinate) && coordinate.length >= 2)
+              .map((coordinate) => [coordinate[0], coordinate[1]] as [number, number]);
+          } catch {
+            // Keep straight-line fallback when route lookup fails.
+          }
+        }),
+      );
+
+      if (isCancelled || Object.keys(fetchedRoutes).length === 0) return;
+
+      setRouteCoordinatesByPair((previous) => ({ ...previous, ...fetchedRoutes }));
+    };
+
+    void fetchRoutes();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [mapboxToken, mode, routeCoordinatesByPair, scopedRoutePairs]);
 
   const hospitalNodeGeoJson = useMemo<FeatureCollection<Point>>(() => {
     return {
@@ -352,11 +523,14 @@ export function ShipmentMapCanvas({
       const to = hospitalsById.get(shipment.toHospitalId);
       if (!from || !to) continue;
 
+      const routePairKey = createRoutePairKey(shipment.fromHospitalId, shipment.toHospitalId);
+      const routeCoordinates = routeCoordinatesByPair[routePairKey] ?? [from.coordinates, to.coordinates];
+
       features.push({
         type: "Feature",
         geometry: {
           type: "LineString",
-          coordinates: [from.coordinates, to.coordinates],
+          coordinates: routeCoordinates,
         },
         properties: {
           shipmentId: shipment.id,
@@ -376,7 +550,7 @@ export function ShipmentMapCanvas({
       type: "FeatureCollection",
       features,
     };
-  }, [hospitalsById, scopedShipments]);
+  }, [hospitalsById, routeCoordinatesByPair, scopedShipments]);
 
   const shipmentTruckGeoJson = useMemo<FeatureCollection<Point>>(() => {
     const features: Feature<Point>[] = [];
@@ -386,10 +560,10 @@ export function ShipmentMapCanvas({
       const to = hospitalsById.get(shipment.toHospitalId);
       if (!from || !to) continue;
 
-      const fallbackCoordinates =
-        shipment.status === "planned" || shipment.status === "approved"
-          ? from.coordinates
-          : shipment.currentCoordinates;
+      const routePairKey = createRoutePairKey(shipment.fromHospitalId, shipment.toHospitalId);
+      const routeCoordinates = routeCoordinatesByPair[routePairKey] ?? [from.coordinates, to.coordinates];
+      const routeProgress = shipment.status === "planned" || shipment.status === "approved" ? 0 : shipment.progress;
+      const fallbackCoordinates = interpolateOnRoute(routeCoordinates, routeProgress);
 
       features.push({
         type: "Feature",
@@ -415,7 +589,7 @@ export function ShipmentMapCanvas({
       type: "FeatureCollection",
       features,
     };
-  }, [activeScopedShipments, hospitalsById]);
+  }, [activeScopedShipments, hospitalsById, routeCoordinatesByPair]);
 
   const selectedHospital = useMemo(() => {
     if (!selectedHospitalId) return null;
@@ -515,11 +689,45 @@ export function ShipmentMapCanvas({
       ? ["hospital-risk-hit", "hospital-risk-points"]
       : ["shipment-routes-hit", "shipment-routes", "shipment-routes-selected", "shipment-trucks", "hospital-nodes"];
 
-  const handleReset = () => {
-    mapRef.current?.flyTo({
-      center: [INITIAL_VIEW_STATE.longitude, INITIAL_VIEW_STATE.latitude],
-      zoom: INITIAL_VIEW_STATE.zoom,
+  const focusMapForContext = useCallback((animate: boolean) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (mode === "riskHeatmap") {
+      map.fitBounds(BULGARIA_BOUNDS, {
+        padding: 48,
+        maxZoom: 7.2,
+        duration: animate ? 900 : 0,
+      });
+      return;
+    }
+
+    if (highlightedHospitalLongitude !== null && highlightedHospitalLatitude !== null) {
+      map.flyTo({
+        center: [highlightedHospitalLongitude, highlightedHospitalLatitude],
+        zoom: HOSPITAL_VIEW_ZOOM,
+        duration: animate ? 800 : 0,
+      });
+      return;
+    }
+
+    map.flyTo({
+      center: [DEFAULT_VIEW_STATE.longitude, DEFAULT_VIEW_STATE.latitude],
+      zoom: DEFAULT_VIEW_STATE.zoom,
+      duration: animate ? 800 : 0,
     });
+  }, [highlightedHospitalLatitude, highlightedHospitalLongitude, mode]);
+
+  useEffect(() => {
+    const contextKey = `${mode}:${highlightedHospitalId ?? "none"}`;
+    if (lastContextKeyRef.current === contextKey) return;
+
+    lastContextKeyRef.current = contextKey;
+    focusMapForContext(false);
+  }, [focusMapForContext, highlightedHospitalId, mode]);
+
+  const handleReset = () => {
+    focusMapForContext(true);
   };
 
   if (!mapboxToken) {
@@ -532,7 +740,7 @@ export function ShipmentMapCanvas({
 
   return (
     <div className="relative h-[500px] w-full overflow-hidden rounded-[inherit]">
-      <div className="absolute left-3 top-3 z-10 rounded-md bg-slate-900/85 px-3 py-2 font-mono text-xs text-white">
+      <div className="absolute left-3 top-3 z-10 rounded-md border border-slate-200 bg-white/95 px-3 py-2 font-mono text-xs text-slate-700 shadow-sm">
         Longitude: {center[0].toFixed(4)} | Latitude: {center[1].toFixed(4)} | Zoom: {zoom.toFixed(2)}
       </div>
 
@@ -547,14 +755,18 @@ export function ShipmentMapCanvas({
       <MapView
         ref={mapRef}
         mapboxAccessToken={mapboxToken}
-        mapStyle="mapbox://styles/mapbox/dark-v11"
-        initialViewState={INITIAL_VIEW_STATE}
+        mapStyle="mapbox://styles/mapbox/light-v11"
+        initialViewState={initialViewState}
         maxZoom={20}
         minZoom={3}
-        style={{ width: "100%", height: "100%", backgroundColor: "#e2e8f0" }}
+        style={{ width: "100%", height: "100%", backgroundColor: "#f8fafc" }}
         attributionControl={false}
         interactiveLayerIds={interactiveLayerIds}
         onClick={handleMapClick}
+        onLoad={() => {
+          lastContextKeyRef.current = `${mode}:${highlightedHospitalId ?? "none"}`;
+          focusMapForContext(false);
+        }}
         onMove={(event) => {
           setCenter([event.viewState.longitude, event.viewState.latitude]);
           setZoom(event.viewState.zoom);
@@ -594,85 +806,92 @@ export function ShipmentMapCanvas({
         )}
       </MapView>
 
-      {mode === "riskHeatmap" && selectedHospital ? (
-        <div className="absolute right-3 top-3 z-10 w-[290px] rounded-xl border border-cyan-300/30 bg-slate-950/85 p-3 text-xs text-slate-100 shadow-2xl backdrop-blur-sm">
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-semibold text-cyan-100">{formatHospitalLabel(selectedHospital)}</p>
-              <p className="text-[11px] text-slate-300">Most important hospital signals and issues</p>
+      <Sheet
+        open={mode === "riskHeatmap" && !!selectedHospital}
+        onOpenChange={(open) => {
+          if (!open) setSelectedHospitalId(null);
+        }}
+      >
+        {mode === "riskHeatmap" && selectedHospital ? (
+          <SheetContent side="right" className="w-full border-slate-200 bg-white sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle className="text-slate-900">{formatHospitalLabel(selectedHospital)}</SheetTitle>
+              <SheetDescription>Most important hospital signals and issues</SheetDescription>
+            </SheetHeader>
+            <div className="space-y-4 px-4 pb-6 text-sm text-slate-700">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p>
+                  Top shortage: {selectedHospitalMaxShortage?.bloodType ?? "n/a"} ({Math.round(selectedHospitalMaxShortage?.shortageRiskScore ?? 0)} risk)
+                </p>
+                <p>
+                  Active shipments: {selectedHospitalShipmentStats.inboundActive} inbound, {selectedHospitalShipmentStats.outboundActive} outbound
+                </p>
+                <p>Delayed lanes: {selectedHospitalShipmentStats.delayed}</p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Issue Signals</p>
+                {topIssueForecasts.length > 0 ? (
+                  <ul className="space-y-1">
+                    {topIssueForecasts.map((forecast) => (
+                      <li key={`${forecast.hospitalId}-${forecast.bloodType}`}>
+                        {forecast.bloodType}: {Math.round(forecast.shortageRiskScore)} risk, demand {forecast.predictedDemand24h}u
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No critical/high shortage issues.</p>
+                )}
+              </div>
+
+              {selectedHospital.alerts.length > 0 ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em]">Alerts</p>
+                  <ul className="space-y-1">
+                    {selectedHospital.alerts.slice(0, 2).map((alert) => (
+                      <li key={alert}>{alert}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
-            <button
-              type="button"
-              onClick={() => setSelectedHospitalId(null)}
-              className="rounded border border-slate-600 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-300"
-            >
-              Close
-            </button>
-          </div>
+          </SheetContent>
+        ) : null}
+      </Sheet>
 
-          <div className="space-y-1.5 text-[11px] text-slate-200">
-            <p>
-              Top shortage: {selectedHospitalMaxShortage?.bloodType ?? "n/a"} ({Math.round(selectedHospitalMaxShortage?.shortageRiskScore ?? 0)} risk)
-            </p>
-            <p>
-              Active shipments: {selectedHospitalShipmentStats.inboundActive} inbound, {selectedHospitalShipmentStats.outboundActive} outbound
-            </p>
-            <p>Delayed lanes: {selectedHospitalShipmentStats.delayed}</p>
-            <p>
-              Issues: {topIssueForecasts.length > 0 ? "" : "No critical/high shortage issues"}
-            </p>
-          </div>
-
-          {topIssueForecasts.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-[11px] text-slate-200">
-              {topIssueForecasts.map((forecast) => (
-                <li key={`${forecast.hospitalId}-${forecast.bloodType}`}>
-                  {forecast.bloodType}: {Math.round(forecast.shortageRiskScore)} risk, demand {forecast.predictedDemand24h}u
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {selectedHospital.alerts.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-[11px] text-amber-200">
-              {selectedHospital.alerts.slice(0, 2).map((alert) => (
-                <li key={alert}>Alert: {alert}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
-
-      {mode === "base" && selectedShipment ? (
-        <div className="absolute right-3 top-3 z-10 w-[300px] rounded-xl border border-cyan-300/30 bg-slate-950/85 p-3 text-xs text-slate-100 shadow-2xl backdrop-blur-sm">
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-semibold text-cyan-100">Shipment Telemetry</p>
-              <p className="text-[11px] text-slate-300">{selectedShipment.bloodType} - {selectedShipment.quantity}u</p>
+      <Sheet
+        open={mode === "base" && !!selectedShipment}
+        onOpenChange={(open) => {
+          if (!open) setSelectedShipmentId(null);
+        }}
+      >
+        {mode === "base" && selectedShipment ? (
+          <SheetContent side="right" className="w-full border-slate-200 bg-white sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle className="text-slate-900">Shipment Telemetry</SheetTitle>
+              <SheetDescription>
+                {selectedShipment.bloodType} - {selectedShipment.quantity}u
+              </SheetDescription>
+            </SheetHeader>
+            <div className="space-y-4 px-4 pb-6 text-sm text-slate-700">
+              <div className="space-y-1 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p>From: {formatHospitalLabel(selectedShipmentFromHospital)}</p>
+                <p>To: {formatHospitalLabel(selectedShipmentToHospital)}</p>
+              </div>
+              <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3">
+                <p>Status: {selectedShipment.status.replaceAll("_", " ")}</p>
+                <p>Priority: {selectedShipment.priority}</p>
+                <p>Progress: {Math.round(selectedShipment.progress * 100)}%</p>
+                <p>ETA: {formatMinutes(selectedShipment.etaMinutes)}</p>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setSelectedShipmentId(null)}
-              className="rounded border border-slate-600 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-300"
-            >
-              Close
-            </button>
-          </div>
-
-          <div className="space-y-1.5 text-[11px] text-slate-200">
-            <p>From: {formatHospitalLabel(selectedShipmentFromHospital)}</p>
-            <p>To: {formatHospitalLabel(selectedShipmentToHospital)}</p>
-            <p>Status: {selectedShipment.status.replaceAll("_", " ")}</p>
-            <p>Priority: {selectedShipment.priority}</p>
-            <p>Progress: {Math.round(selectedShipment.progress * 100)}%</p>
-            <p>ETA: {formatMinutes(selectedShipment.etaMinutes)}</p>
-          </div>
-        </div>
-      ) : null}
+          </SheetContent>
+        ) : null}
+      </Sheet>
 
       {mode === "base" ? (
-        <div className="absolute bottom-3 left-3 z-10 rounded-md border border-slate-600 bg-slate-950/85 px-3 py-2 text-[11px] text-slate-100 backdrop-blur-sm">
-          <p className="font-semibold text-cyan-100">Route Legend</p>
+        <div className="absolute bottom-3 left-3 z-10 rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-[11px] text-slate-700 shadow-sm">
+          <p className="font-semibold text-slate-900">Route Legend</p>
           <p>cyan: in transit | amber: delayed | blue: approved | gray: planned</p>
           <p>Click route or truck marker for shipment details.</p>
         </div>
