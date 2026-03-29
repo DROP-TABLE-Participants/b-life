@@ -18,8 +18,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { formatHospitalLabel, formatMinutes } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn, formatHospitalLabel, formatMinutes } from "@/lib/utils";
 import type { Forecast, Hospital, Shipment } from "@/types/domain";
+import surfaceStyles from "../dashboard/DashboardCardSurface.module.css";
+import sheetStyles from "../dashboard/BloodTypeInsightSheet.module.css";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 interface ShipmentMapCanvasProps {
@@ -813,46 +816,86 @@ export function ShipmentMapCanvas({
         }}
       >
         {mode === "riskHeatmap" && selectedHospital ? (
-          <SheetContent side="right" className="w-full border-slate-200 bg-white sm:max-w-md">
-            <SheetHeader>
-              <SheetTitle className="text-slate-900">{formatHospitalLabel(selectedHospital)}</SheetTitle>
-              <SheetDescription>Most important hospital signals and issues</SheetDescription>
+          <SheetContent side="right" className={sheetStyles.bloodTypeSheetContent}>
+            <SheetHeader className={sheetStyles.bloodTypeSheetHeader}>
+              <div className={sheetStyles.bloodTypeSheetHeadingRow}>
+                <div className={sheetStyles.bloodTypeSheetTitleRow}>
+                  <SheetTitle className={sheetStyles.bloodTypeSheetTitle}>{formatHospitalLabel(selectedHospital)}</SheetTitle>
+                </div>
+                <SheetDescription className={sheetStyles.bloodTypeSheetDescription}>
+                  Most important hospital signals and issues
+                </SheetDescription>
+              </div>
             </SheetHeader>
-            <div className="space-y-4 px-4 pb-6 text-sm text-slate-700">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p>
-                  Top shortage: {selectedHospitalMaxShortage?.bloodType ?? "n/a"} ({Math.round(selectedHospitalMaxShortage?.shortageRiskScore ?? 0)} risk)
-                </p>
-                <p>
-                  Active shipments: {selectedHospitalShipmentStats.inboundActive} inbound, {selectedHospitalShipmentStats.outboundActive} outbound
-                </p>
-                <p>Delayed lanes: {selectedHospitalShipmentStats.delayed}</p>
-              </div>
+            <div className={sheetStyles.bloodTypeSheetBody}>
+              <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
+                <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
+                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Hospital Snapshot</CardTitle>
+                </CardHeader>
+                <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
+                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Top shortage</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricValue}>
+                      {selectedHospitalMaxShortage?.bloodType ?? "n/a"}
+                    </span>
+                  </div>
+                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Shortage risk</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricValue}>
+                      {Math.round(selectedHospitalMaxShortage?.shortageRiskScore ?? 0)}
+                    </span>
+                  </div>
+                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Inbound active</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricValue}>{selectedHospitalShipmentStats.inboundActive}</span>
+                  </div>
+                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Outbound active</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricValue}>{selectedHospitalShipmentStats.outboundActive}</span>
+                  </div>
+                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Delayed lanes</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricValue}>{selectedHospitalShipmentStats.delayed}</span>
+                  </div>
+                </CardContent>
+              </Card>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Issue Signals</p>
-                {topIssueForecasts.length > 0 ? (
-                  <ul className="space-y-1">
-                    {topIssueForecasts.map((forecast) => (
-                      <li key={`${forecast.hospitalId}-${forecast.bloodType}`}>
-                        {forecast.bloodType}: {Math.round(forecast.shortageRiskScore)} risk, demand {forecast.predictedDemand24h}u
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>No critical/high shortage issues.</p>
-                )}
-              </div>
+              <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
+                <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
+                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Issue Signals</CardTitle>
+                </CardHeader>
+                <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
+                  {topIssueForecasts.length > 0 ? (
+                    <div className="space-y-2">
+                      {topIssueForecasts.map((forecast) => (
+                        <div key={`${forecast.hospitalId}-${forecast.bloodType}`} className={sheetStyles.bloodTypeSheetBulletRow}>
+                          <span className={sheetStyles.bloodTypeSheetBullet} />
+                          <span className={sheetStyles.bloodTypeSheetMetricLabel}>
+                            {forecast.bloodType}: {Math.round(forecast.shortageRiskScore)} risk, demand {forecast.predictedDemand24h}u
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className={sheetStyles.bloodTypeSheetEmptyState}>No critical/high shortage issues.</p>
+                  )}
+                </CardContent>
+              </Card>
 
               {selectedHospital.alerts.length > 0 ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em]">Alerts</p>
-                  <ul className="space-y-1">
+                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
+                  <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
+                    <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Alerts</CardTitle>
+                  </CardHeader>
+                  <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
                     {selectedHospital.alerts.slice(0, 2).map((alert) => (
-                      <li key={alert}>{alert}</li>
+                      <div key={alert} className={sheetStyles.bloodTypeSheetBulletRow}>
+                        <span className={sheetStyles.bloodTypeSheetBullet} />
+                        <span className={sheetStyles.bloodTypeSheetMetricLabel}>{alert}</span>
+                      </div>
                     ))}
-                  </ul>
-                </div>
+                  </CardContent>
+                </Card>
               ) : null}
             </div>
           </SheetContent>
@@ -866,23 +909,59 @@ export function ShipmentMapCanvas({
         }}
       >
         {mode === "base" && selectedShipment ? (
-          <SheetContent side="right" className="w-full border-slate-200 bg-white sm:max-w-md">
-            <SheetHeader>
-              <SheetTitle className="text-slate-900">Shipment Telemetry</SheetTitle>
-              <SheetDescription>
-                {selectedShipment.bloodType} - {selectedShipment.quantity}u
-              </SheetDescription>
-            </SheetHeader>
-            <div className="space-y-4 px-4 pb-6 text-sm text-slate-700">
-              <div className="space-y-1 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p>From: {formatHospitalLabel(selectedShipmentFromHospital)}</p>
-                <p>To: {formatHospitalLabel(selectedShipmentToHospital)}</p>
+          <SheetContent side="right" className={sheetStyles.bloodTypeSheetContent}>
+            <SheetHeader className={sheetStyles.bloodTypeSheetHeader}>
+              <div className={sheetStyles.bloodTypeSheetHeadingRow}>
+                <div className={sheetStyles.bloodTypeSheetTitleRow}>
+                  <SheetTitle className={sheetStyles.bloodTypeSheetTitle}>Shipment Telemetry</SheetTitle>
+                </div>
+                <SheetDescription className={sheetStyles.bloodTypeSheetDescription}>
+                  {selectedShipment.bloodType} - {selectedShipment.quantity}u
+                </SheetDescription>
               </div>
-              <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3">
-                <p>Status: {selectedShipment.status.replaceAll("_", " ")}</p>
-                <p>Priority: {selectedShipment.priority}</p>
-                <p>Progress: {Math.round(selectedShipment.progress * 100)}%</p>
-                <p>ETA: {formatMinutes(selectedShipment.etaMinutes)}</p>
+            </SheetHeader>
+            <div className={sheetStyles.bloodTypeSheetBody}>
+              <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
+                <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
+                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Route</CardTitle>
+                </CardHeader>
+                <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
+                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>From</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>{formatHospitalLabel(selectedShipmentFromHospital)}</span>
+                  </div>
+                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>To</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>{formatHospitalLabel(selectedShipmentToHospital)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className={sheetStyles.bloodTypeSheetStatsGrid}>
+                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
+                  <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
+                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Status</p>
+                    <p className={sheetStyles.bloodTypeSheetStatValue}>{selectedShipment.status.replaceAll("_", " ")}</p>
+                  </CardContent>
+                </Card>
+                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
+                  <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
+                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Priority</p>
+                    <p className={sheetStyles.bloodTypeSheetStatValue}>{selectedShipment.priority}</p>
+                  </CardContent>
+                </Card>
+                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
+                  <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
+                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Progress</p>
+                    <p className={sheetStyles.bloodTypeSheetStatValue}>{Math.round(selectedShipment.progress * 100)}%</p>
+                  </CardContent>
+                </Card>
+                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
+                  <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
+                    <p className={sheetStyles.bloodTypeSheetStatLabel}>ETA</p>
+                    <p className={sheetStyles.bloodTypeSheetStatValue}>{formatMinutes(selectedShipment.etaMinutes)}</p>
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </SheetContent>
