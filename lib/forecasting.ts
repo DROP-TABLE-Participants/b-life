@@ -4,6 +4,7 @@ import type { AppState, BloodType, Forecast, Hospital, RiskByBloodType, Shipment
 
 const PROGRESSIVE_INBOUND = new Set(["in_transit", "delayed"]);
 const ACTIVE_OUTBOUND = new Set(["approved", "planned", "in_transit", "delayed"]);
+const SERVICE_LEVEL_Z = 1.28;
 
 const demandMultiplierByCapacity: Record<Hospital["capacityLevel"], number> = {
   low: 0.85,
@@ -58,6 +59,23 @@ const resolveHolidayMultiplier = (isoDate: string | undefined, bloodType: BloodT
   return labels.length ? { multiplier, label: labels.join(" + ") } : { multiplier };
 };
 
+const erfApprox = (x: number): number => {
+  const sign = x < 0 ? -1 : 1;
+  const absX = Math.abs(x);
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+
+  const t = 1 / (1 + p * absX);
+  const y = 1 - (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) * Math.exp(-absX * absX);
+  return sign * y;
+};
+
+const normalCdf = (x: number): number => 0.5 * (1 + erfApprox(x / Math.sqrt(2)));
+
 const sumInboundUnits = (hospitalId: string, bloodType: BloodType, shipments: Shipment[]): number =>
   shipments
     .filter((shipment) => shipment.bloodType === bloodType && shipment.toHospitalId === hospitalId)
@@ -109,15 +127,28 @@ export const runForecastingEngine = (
       const inboundUnits = sumInboundUnits(hospital.id, bloodType, shipments);
       const outboundUnits = sumOutboundUnits(hospital.id, bloodType, shipments);
 
-      const projected24h = currentUnits + inboundUnits - outboundUnits;
-      const shortageGap = predictedDemand24h - projected24h;
-      const surplusGap = projected24h - predictedDemand48h * 0.42;
+      // Notebook-aligned approximation: use 3-day expected demand and uncertainty
+      // to estimate shortage probability and safety-stock pressure.
+      const available3d = currentUnits + inboundUnits - outboundUnits;
+      const mu3 = predictedDemand24h * 2.2;
+      const sigmaDaily = Math.max(1.2, predictedDemand24h * 0.18);
+      const sigma3 = Math.sqrt(3) * sigmaDaily;
+      const requiredStock3d = mu3 + SERVICE_LEVEL_Z * sigma3;
 
-      const shortageRiskScore = clamp((shortageGap / Math.max(predictedDemand24h, 1)) * 100 + (cityFactor - 1) * 40, 0, 100);
-      const surplusRiskScore = clamp((surplusGap / Math.max(predictedDemand24h, 1)) * 100, 0, 100);
+      const zShortage = sigma3 <= 1e-9 ? (available3d < mu3 ? -Infinity : Infinity) : (available3d - mu3) / sigma3;
+      const shortageRiskProbability = sigma3 <= 1e-9 ? (available3d < mu3 ? 1 : 0) : 1 - normalCdf(zShortage);
+
+      const overstockThreshold = mu3 + 0.5 * sigma3;
+      const zSurplus = sigma3 <= 1e-9 ? (available3d > overstockThreshold ? Infinity : -Infinity) : (available3d - overstockThreshold) / sigma3;
+      const surplusRiskProbability = sigma3 <= 1e-9 ? (available3d > overstockThreshold ? 1 : 0) : normalCdf(zSurplus);
+
+      const safetyGap = requiredStock3d - available3d;
+      const shortageRiskScore = clamp(shortageRiskProbability * 100 + (safetyGap > 0 ? Math.min(15, safetyGap / 3) : 0), 0, 100);
+      const surplusRiskScore = clamp(surplusRiskProbability * 100 + (safetyGap < 0 ? Math.min(12, Math.abs(safetyGap) / 4) : 0), 0, 100);
 
       const topFactors = [
-        `Stock ${Math.round(currentUnits)}u vs 24h demand ${predictedDemand24h}u`,
+        `Available 3d ${Math.round(available3d)}u vs required ${Math.round(requiredStock3d)}u`,
+        `Demand outlook mu3 ${Math.round(mu3)}u ±${Math.round(sigma3)}u`,
         `Inbound ${Math.round(inboundUnits)}u / Outbound ${Math.round(outboundUnits)}u`,
       ];
 
