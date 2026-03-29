@@ -39,6 +39,7 @@ RUN npm ci --omit=optional --omit=prod
 # Copy standalone server, static files, and public assets
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
 # Expose the port and start the standalone server
 EXPOSE 3000

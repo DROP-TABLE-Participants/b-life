@@ -9,6 +9,9 @@ import { Separator } from "@/components/ui/separator";
 import { APP_NAME } from "@/lib/constants";
 import { useInitializeAppState } from "@/hooks/useInitializeAppState";
 import { useAppStore } from "@/store/useAppStore";
+import Image from "next/image";
+
+import logo from "@/public/b.life-logo.png";
 
 export default function LandingPage() {
   useInitializeAppState();
@@ -48,7 +51,7 @@ export default function LandingPage() {
 
       <Card className="relative z-10 w-full max-w-[450px]">
         <CardHeader className="items-center justify-center pb-2">
-          <img src="/b.life-logo.png?v=2" alt={`${APP_NAME} logo`} width={56} height={56} className="h-14 w-14 object-contain" />
+          <Image src={logo} alt={`${APP_NAME} logo`} width={56} height={56} className="h-14 w-14 object-contain" />
         </CardHeader>
         <CardContent className="space-y-5 p-4 sm:space-y-6 sm:p-6">
           <div className="flex flex-col gap-4">

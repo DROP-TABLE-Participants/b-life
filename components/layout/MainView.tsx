@@ -32,6 +32,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import styles from "./MainView.module.css";
+import Image from "next/image";
+import logo from "@/public/b.life-logo.png";
 
 interface MainViewNavigationItem {
   label: string;
@@ -71,7 +73,7 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
               <SidebarMenuItem className={styles.mainViewSidebarHeaderMenuItem}>
                 <SidebarMenuButton size="lg" render={<Link href={navigation[0]?.href ?? "#"} />}>
                   <div className={styles.mainViewSidebarBrandLogo}>
-                    <img src="/b.life-logo.png?v=2" alt="B.Life logo" width={24} height={24} className="size-5 object-contain" />
+                    <Image src={logo} alt="B.Life logo" width={24} height={24} className="size-5 object-contain" />
                   </div>
                   <div className={`grid flex-1 text-left text-sm leading-tight ${styles.mainViewSidebarBrandText}`}>
                     <span className="truncate font-medium">B.Life</span>
