@@ -32,7 +32,7 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-3 py-6 sm:px-4 sm:py-8">
       <video
         className="absolute inset-0 h-full w-full object-cover"
         autoPlay
@@ -43,14 +43,14 @@ export default function LandingPage() {
       >
         <source src="/background-login.mp4" type="video/mp4" />
       </video>
-      <div className="absolute inset-x-0 bottom-0 h-[35vh] bg-gradient-to-t from-white to-white/0" />
+      <div className="absolute inset-x-0 bottom-0 h-[42vh] bg-gradient-to-t from-white to-white/0 sm:h-[35vh]" />
     
 
       <Card className="relative z-10 w-full max-w-[450px]">
-        <CardHeader className="items-center justify-center">
+        <CardHeader className="items-center justify-center pb-2">
           <img src="/b.life-logo.png?v=2" alt={`${APP_NAME} logo`} width={56} height={56} className="h-14 w-14 object-contain" />
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-5 p-4 sm:space-y-6 sm:p-6">
           <div className="flex flex-col gap-4">
             <div className="flex flex-1 flex-col gap-4">
               <div className="space-y-2">

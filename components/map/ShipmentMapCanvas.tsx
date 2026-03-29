@@ -742,8 +742,8 @@ export function ShipmentMapCanvas({
   }
 
   return (
-    <div className="relative h-[500px] w-full overflow-hidden rounded-[inherit]">
-      <div className="absolute left-3 top-3 z-10 rounded-md border border-slate-200 bg-white/95 px-3 py-2 font-mono text-xs text-slate-700 shadow-sm">
+    <div className="relative h-[340px] w-full overflow-hidden rounded-[inherit] sm:h-[420px] lg:h-[500px]">
+      <div className="absolute left-3 top-3 z-10 hidden rounded-md border border-slate-200 bg-white/95 px-3 py-2 font-mono text-xs text-slate-700 shadow-sm sm:block">
         Longitude: {center[0].toFixed(4)} | Latitude: {center[1].toFixed(4)} | Zoom: {zoom.toFixed(2)}
       </div>
 
@@ -969,7 +969,7 @@ export function ShipmentMapCanvas({
       </Sheet>
 
       {mode === "base" ? (
-        <div className="absolute bottom-3 left-3 z-10 rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-[11px] text-slate-700 shadow-sm">
+        <div className="absolute bottom-3 left-3 z-10 hidden rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-[11px] text-slate-700 shadow-sm sm:block">
           <p className="font-semibold text-slate-900">Route Legend</p>
           <p>cyan: in transit | amber: delayed | blue: approved | gray: planned</p>
           <p>Click route or truck marker for shipment details.</p>

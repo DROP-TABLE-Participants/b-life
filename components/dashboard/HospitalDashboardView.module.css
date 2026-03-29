@@ -104,9 +104,10 @@
 
 .hospitalDashboardTransferTitleRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .hospitalDashboardTransferTitle {
@@ -114,17 +115,21 @@
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.25rem;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .hospitalDashboardTransferText {
   margin: 0;
   font-size: 0.875rem;
   line-height: 1.25rem;
+  word-break: break-word;
 }
 
 .hospitalDashboardTransferActions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .hospitalDashboardButton {
@@ -134,7 +139,7 @@
 .hospitalDashboardDispatchCard {
   display: flex;
   flex-direction: column;
-  min-height: 500px;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -146,7 +151,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;
+  min-height: clamp(280px, 45vh, 520px);
 }
 
 .hospitalDashboardMapFrame {
@@ -156,11 +161,6 @@
 }
 
 @media (max-width: 1100px) {
-  .hospitalDashboard {
-    grid-template-rows: auto auto auto auto;
-    height: auto;
-  }
-
   .hospitalDashboardMiddleRow {
     grid-template-columns: 1fr;
   }
@@ -170,6 +170,54 @@
   }
 
   .hospitalDashboardMapWrap {
-    min-height: 320px;
+    min-height: clamp(260px, 42vh, 420px);
+  }
+}
+
+@media (max-width: 900px) {
+  .hospitalDashboardHeading {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+
+  .hospitalDashboardCardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .hospitalDashboardSelectTrigger {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .hospitalDashboardDispatchCard {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .hospitalDashboardSection {
+    margin-bottom: 10px;
+  }
+
+  .hospitalDashboardCardHeader {
+    padding: 14px 14px 0;
+  }
+
+  .hospitalDashboardCardBody {
+    padding: 14px;
+  }
+
+  .hospitalDashboardChartArea {
+    min-height: 220px;
+  }
+
+  .hospitalDashboardMapWrap {
+    min-height: clamp(240px, 38vh, 340px);
+  }
+
+  .hospitalDashboardTransferActions > * {
+    width: 100%;
   }
 }

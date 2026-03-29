@@ -1,6 +1,7 @@
 .mainView {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -58,9 +59,71 @@
   flex-shrink: 0;
 }
 
+.mainViewSidebarBrandText {
+  min-width: 0;
+}
+
+.mainViewSidebarDropdownContent {
+  width: min(92vw, 320px);
+  max-width: min(92vw, 320px);
+}
+
+.mainViewSidebarDropdownSubContent {
+  width: min(92vw, 320px);
+  max-width: min(92vw, 320px);
+}
+
+.mainViewSidebarDropdownItem {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.mainViewSidebarDropdownContent :global([data-slot="dropdown-menu-label"]),
+.mainViewSidebarDropdownContent :global([data-slot="dropdown-menu-sub-trigger"]),
+.mainViewSidebarDropdownSubContent :global([data-slot="dropdown-menu-item"]) {
+  white-space: normal;
+  word-break: break-word;
+}
+
 :global([data-state="collapsed"]) .mainViewSidebarHeaderRow {
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebarHeaderMenu {
+  flex: 0 0 auto;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebar :global([data-slot="sidebar-menu-button"]) {
+  justify-content: center;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebarHeaderMenuItem > :global([data-slot="sidebar-menu-button"]) {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebarBrandLogo img {
+  width: 18px;
+  height: 18px;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebarTrigger {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  align-self: center;
+  margin-inline: auto;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebarTrigger :global(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebarBrandText {
+  display: none;
 }
 
 .mainViewRouterView {
@@ -98,13 +161,55 @@
   flex-direction: column;
   min-height: 100%;
   padding: 20px 70px;
+  gap: 16px;
   overflow: visible;
+}
+
+.mainViewMobileTopBar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding-bottom: 4px;
+}
+
+.mainViewMobileTrigger {
+  flex-shrink: 0;
+}
+
+.mainViewMobileTitleWrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mainViewMobileTitle {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.mainViewMobileSubtitle {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: #64748b;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+@media (max-width: 1280px) {
+  .mainViewRouterCardContent {
+    padding: 18px 28px;
+  }
 }
 
 @media (max-width: 960px) {
   .mainView {
     height: auto;
-    min-height: 100vh;
+    min-height: 100dvh;
     overflow: visible;
   }
 
@@ -113,6 +218,36 @@
   }
 
   .mainViewRouterView {
-    min-height: calc(100vh - 220px);
+    min-height: calc(100dvh - 220px);
+    padding: 8px;
+  }
+
+  .mainViewRouterCard {
+    border-radius: 20px;
+  }
+
+  .mainViewRouterCardContent {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .mainViewMobileTopBar {
+    display: flex;
+  }
+
+  .mainViewSidebarDropdownContent,
+  .mainViewSidebarDropdownSubContent {
+    width: min(94vw, 340px);
+    max-width: min(94vw, 340px);
+  }
+}
+
+@media (max-width: 480px) {
+  .mainViewRouterView {
+    padding: 6px;
+  }
+
+  .mainViewRouterCardContent {
+    padding: 12px;
   }
 }

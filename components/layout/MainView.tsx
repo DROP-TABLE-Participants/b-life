@@ -70,10 +70,10 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
             <SidebarMenu className={styles.mainViewSidebarHeaderMenu}>
               <SidebarMenuItem className={styles.mainViewSidebarHeaderMenuItem}>
                 <SidebarMenuButton size="lg" render={<Link href={navigation[0]?.href ?? "#"} />}>
-                  <div>
-                    <img src="/b.life-logo.png?v=2" alt="B.Life logo" width={20} height={20} className="size-5 object-contain" />
+                  <div className={styles.mainViewSidebarBrandLogo}>
+                    <img src="/b.life-logo.png?v=2" alt="B.Life logo" width={24} height={24} className="size-5 object-contain" />
                   </div>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
+                  <div className={`grid flex-1 text-left text-sm leading-tight ${styles.mainViewSidebarBrandText}`}>
                     <span className="truncate font-medium">B.Life</span>
                     <span className="truncate text-xs">Hospital Workspace</span>
                   </div>
@@ -124,7 +124,12 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
                     <ChevronsUpDown className="ml-auto size-4" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side={open ? "top" : "right"} align="start">
+                <DropdownMenuContent
+                  side={open ? "top" : "right"}
+                  align="start"
+                  collisionPadding={12}
+                  className={styles.mainViewSidebarDropdownContent}
+                >
                   <DropdownMenuLabel>{login.title}</DropdownMenuLabel>
                   {login.details.map((detail) => (
                     <DropdownMenuLabel key={detail} className="pt-0 text-xs font-normal text-muted-foreground">
@@ -135,9 +140,10 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
                   {login.switchOptions?.length ? (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>Switch hospital</DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent>
+                      <DropdownMenuSubContent className={styles.mainViewSidebarDropdownSubContent}>
                         {login.switchOptions.map((option) => (
                           <DropdownMenuItem
+                            className={styles.mainViewSidebarDropdownItem}
                             key={option.href}
                             onClick={() => {
                               option.onSelect?.();
@@ -173,7 +179,16 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
 
       <SidebarInset className={styles.mainViewRouterView}>
         <Card className={styles.mainViewRouterCard}>
-          <CardContent className={styles.mainViewRouterCardContent}>{children}</CardContent>
+          <CardContent className={styles.mainViewRouterCardContent}>
+            <div className={styles.mainViewMobileTopBar}>
+              <SidebarTrigger className={styles.mainViewMobileTrigger} />
+              <div className={styles.mainViewMobileTitleWrap}>
+                <p className={styles.mainViewMobileTitle}>B.Life</p>
+                <p className={styles.mainViewMobileSubtitle}>{login.title}</p>
+              </div>
+            </div>
+            {children}
+          </CardContent>
         </Card>
       </SidebarInset>
     </div>
