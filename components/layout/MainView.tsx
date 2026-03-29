@@ -70,8 +70,8 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
             <SidebarMenu className={styles.mainViewSidebarHeaderMenu}>
               <SidebarMenuItem className={styles.mainViewSidebarHeaderMenuItem}>
                 <SidebarMenuButton size="lg" render={<Link href={navigation[0]?.href ?? "#"} />}>
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                    <House className="size-4" />
+                  <div>
+                    <img src="/b.life-logo.png?v=2" alt="B.Life logo" width={20} height={20} className="size-5 object-contain" />
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">B.Life</span>
