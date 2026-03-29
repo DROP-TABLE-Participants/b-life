@@ -1,14 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
-import { BloodNetworkScene } from "@/components/three/BloodNetworkScene";
 import { Button } from "@/components/ui/button";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
+import { Separator } from "@/components/ui/separator";
+import { APP_NAME } from "@/lib/constants";
 import { useInitializeAppState } from "@/hooks/useInitializeAppState";
 import { useAppStore } from "@/store/useAppStore";
 
@@ -22,11 +20,6 @@ export default function LandingPage() {
 
   const selectedHospitalId = session.hospitalId ?? hospitals[0]?.id ?? "";
 
-  const selectedHospitalName = useMemo(
-    () => hospitals.find((hospital) => hospital.id === selectedHospitalId)?.name,
-    [hospitals, selectedHospitalId],
-  );
-
   const enterHospital = () => {
     if (!selectedHospitalId) return;
     setSession({ mode: "hospital", hospitalId: selectedHospitalId });
@@ -39,59 +32,61 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
-      <div className="absolute inset-0 p-4 lg:p-10">
-        <BloodNetworkScene />
-      </div>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8">
+      <video
+        className="absolute inset-0 h-full w-full object-cover"
+        autoPlay
+        muted
+        loop
+        playsInline
+        aria-hidden="true"
+      >
+        <source src="/background-login.mp4" type="video/mp4" />
+      </video>
+      <div className="absolute inset-x-0 bottom-0 h-[35vh] bg-gradient-to-t from-white to-white/0" />
+    
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 py-8 lg:px-10">
-        <motion.div
-          className="grid w-full gap-6 lg:grid-cols-[1.2fr_1fr]"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55 }}
-        >
-          <GlassCard className="self-start border-slate-200/90 bg-white/78 p-8 lg:p-10">
-            <p className="text-xs uppercase tracking-[0.35em] text-cyan-700">Regional Logistics Intelligence</p>
-            <h1 className="mt-4 text-6xl font-semibold tracking-tight text-slate-950">{APP_NAME}</h1>
-            <p className="mt-3 max-w-lg text-lg text-slate-700">{APP_TAGLINE}</p>
-            <p className="mt-5 max-w-xl text-sm leading-relaxed text-slate-600">
-              Predict shortages, orchestrate blood redistribution, and monitor live shipment routes across your hospital network.
-            </p>
-          </GlassCard>
+      <Card className="relative z-10 w-full max-w-[450px]">
+        <CardHeader className="items-center justify-center">
+          <img src="/b.life-logo.png?v=2" alt={`${APP_NAME} logo`} width={56} height={56} className="h-14 w-14 object-contain" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-1 flex-col gap-4">
+              <div className="space-y-2">
+                <Label className="text-[rgb(60,66,87)]">Hospital</Label>
+                <Select value={selectedHospitalId} onValueChange={(value) => setSession({ mode: "hospital", hospitalId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select hospital" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hospitals.map((hospital) => (
+                      <SelectItem key={hospital.id} value={hospital.id}>
+                        {hospital.name} · {hospital.city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-4">
-            <GlassCard className="space-y-4 border-slate-200/90 bg-white/82">
-              <h2 className="text-xl font-semibold">Hospital Login</h2>
-              <p className="text-sm text-slate-600">Enter a hospital command view and monitor your local supply chain.</p>
-              <Label className="block uppercase tracking-[0.2em] text-cyan-700">Hospital</Label>
-              <Select value={selectedHospitalId} onValueChange={(value) => setSession({ mode: "hospital", hospitalId: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select hospital" />
-                </SelectTrigger>
-                <SelectContent>
-                  {hospitals.map((hospital) => (
-                    <SelectItem key={hospital.id} value={hospital.id}>
-                      {hospital.name} · {hospital.city}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button type="button" variant="default" className="w-full" onClick={enterHospital}>
-                Enter {selectedHospitalName ? `(${selectedHospitalName})` : "Hospital"}
+              <Button
+                type="button"
+                size="lg"
+                className="bg-[#e85a39] py-5 hover:bg-[#e85a39]/90"
+                onClick={enterHospital}
+              >
+                Sign in
               </Button>
-            </GlassCard>
+            </div>
 
-            <GlassCard className="space-y-4 border-slate-200/90 bg-white/82">
-              <h2 className="text-xl font-semibold">Control Tower Login</h2>
-              <p className="text-sm text-slate-600">Monitor all hospitals, active transfers, and decision-engine recommendations.</p>
-              <Button type="button" variant="outline" className="w-full" onClick={enterControlTower}>
-                Enter Regional Control Tower
-              </Button>
-            </GlassCard>
+            <Separator />
+
+            <Button type="button" variant="outline" size="lg" onClick={enterControlTower}>
+              Admin View Login
+            </Button>
           </div>
-        </motion.div>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </main>
   );
 }
