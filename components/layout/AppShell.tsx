@@ -53,7 +53,7 @@ export function AppShell({ title, subtitle, actionLabel, onAction, navigation = 
 
           <div className={styles.sidebarFooter}>
             <Link href="/" className={styles.sidebarSwitchLink}>
-              Switch Account
+              Смяна на акаунт
             </Link>
             {actionLabel && onAction && (
               <div className={styles.sidebarActionWrap}>

@@ -1,89 +1,59 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { HospitalDashboardView } from "@/components/dashboard/HospitalDashboardView";
 import { MainView } from "@/components/layout/MainView";
 import { useInitializeAppState } from "@/hooks/useInitializeAppState";
+import { FACILITY_ROLE_LABELS, sessionForFacility } from "@/lib/access";
 import { useAppStore } from "@/store/useAppStore";
 
 export default function HospitalPage() {
   useInitializeAppState();
-
-  const params = useParams<{ hospitalId: string }>();
-  const routeHospitalId = params?.hospitalId;
-
-  const tickShipments = useAppStore((state) => state.tickShipments);
-  const hospitals = useAppStore((state) => state.hospitals);
-  const shipments = useAppStore((state) => state.shipments);
-  const forecasts = useAppStore((state) => state.forecasts);
-  const recommendations = useAppStore((state) => state.recommendations);
-  const approveRecommendation = useAppStore((state) => state.approveRecommendation);
-  const dispatchRecommendation = useAppStore((state) => state.dispatchRecommendation);
-  const dispatchShipment = useAppStore((state) => state.dispatchShipment);
-  const markShipmentReceived = useAppStore((state) => state.markShipmentReceived);
-  const session = useAppStore((state) => state.session);
-  const setSession = useAppStore((state) => state.setSession);
+  const { hospitalId } = useParams<{ hospitalId: string }>();
+  const state = useAppStore();
+  const { initialized, hospitals, shipments, forecasts, recommendations, session, setSession, tickShipments } = state;
+  const activeHospital = hospitals.find((hospital) => hospital.id === hospitalId);
 
   useEffect(() => {
-    const id = setInterval(() => tickShipments(), 3500);
+    const id = setInterval(tickShipments, 3500);
     return () => clearInterval(id);
   }, [tickShipments]);
 
   useEffect(() => {
-    if (routeHospitalId && (session.mode !== "hospital" || session.hospitalId !== routeHospitalId)) {
-      setSession({ mode: "hospital", hospitalId: routeHospitalId });
+    if (initialized && activeHospital && (session.mode !== activeHospital.kind || session.hospitalId !== activeHospital.id)) {
+      setSession(sessionForFacility(activeHospital));
     }
-  }, [routeHospitalId, session.mode, session.hospitalId, setSession]);
+  }, [initialized, activeHospital, session.mode, session.hospitalId, setSession]);
 
-  const activeHospital = hospitals.find((hospital) => hospital.id === routeHospitalId) ?? hospitals[0];
-
-  if (!activeHospital) return null;
-
-  const runAsActiveHospital = (fn: () => void) => {
-    if (session.mode !== "hospital" || session.hospitalId !== activeHospital.id) {
-      setSession({ mode: "hospital", hospitalId: activeHospital.id });
-    }
-    fn();
-  };
+  if (!initialized) return <p className="p-6">Зареждане на акаунта…</p>;
+  if (!activeHospital) return <div className="p-6"><h1>Акаунтът не е намерен</h1><Link href="/">Изберете акаунт</Link></div>;
 
   return (
     <MainView
-      navigation={[
-        {
-          label: "Home",
-          href: `/hospital/${activeHospital.id}`,
-        },
-      ]}
+      navigation={[{ label: "Начало", href: `/hospital/${activeHospital.id}` }]}
       login={{
         title: activeHospital.name,
-        role: "Hospital Login",
+        role: FACILITY_ROLE_LABELS[activeHospital.kind],
         details: [activeHospital.city],
-        switchOptions: hospitals.map((hospital) => ({
-          label: `${hospital.name} · ${hospital.city}`,
-          href: `/hospital/${hospital.id}`,
-          onSelect: () => setSession({ mode: "hospital", hospitalId: hospital.id }),
-        })),
-        logoutHref: "/",
-        onLogout: () => setSession({ mode: null, hospitalId: null }),
+        switchOptions: [
+          ...hospitals.map((hospital) => ({
+            label: hospital.name, href: `/hospital/${hospital.id}`,
+            onSelect: () => setSession(sessionForFacility(hospital)),
+          })),
+        ],
+        logoutHref: "/", onLogout: () => setSession({ mode: null, hospitalId: null }),
       }}
     >
       <HospitalDashboardView
-          hospital={activeHospital}
-          hospitals={hospitals}
-          shipments={shipments}
-          forecasts={forecasts}
-          recommendations={recommendations}
-          currentHospitalId={activeHospital.id}
-          onApproveRecommendation={(recommendationId) =>
-            runAsActiveHospital(() => approveRecommendation(recommendationId))
-          }
-          onDispatchRecommendation={(recommendationId) =>
-            runAsActiveHospital(() => dispatchRecommendation(recommendationId))
-          }
-          onDispatchShipment={(shipmentId) => runAsActiveHospital(() => dispatchShipment(shipmentId))}
-          onReceiveShipment={(shipmentId) => runAsActiveHospital(() => markShipmentReceived(shipmentId))}
-        />
+        key={activeHospital.id}
+        hospital={activeHospital} hospitals={hospitals} shipments={shipments} forecasts={forecasts}
+        recommendations={recommendations} currentHospitalId={activeHospital.id}
+        onApproveRecommendation={state.approveRecommendation} onDispatchRecommendation={state.dispatchRecommendation}
+        onDispatchShipment={state.dispatchShipment} onReceiveShipment={state.markShipmentReceived}
+        onScheduleManualShipment={state.scheduleManualShipment}
+      />
     </MainView>
   );
 }

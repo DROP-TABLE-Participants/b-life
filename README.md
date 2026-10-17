@@ -28,6 +28,30 @@ Stoyan Ivanov, Kalin Chervenkov, Mario Berberov, Boris Savov, Egor Semenov
 ## 📥 Installation & Set Up
 <p> To install our project on your machine you just need to clone it and run it using docker or npm</p>
 
+### Local mock demo
+
+Run `npm install` and `npm run dev`, then open [localhost:3000](http://localhost:3000).
+Choose a center or hospital from the account dropdown, or use the separate Ministry administrator login button; no password is required. The application interface is in Bulgarian.
+
+| Account | Forecast access | Transfer recommendations | Shipments |
+| --- | --- | --- | --- |
+| Национален център по трансфузионна хематология | All centers and hospitals | Approve and dispatch its own outgoing recommendations | Send, receive, active shipments and history |
+| Регионален Център Стара Загора | Itself and its hospitals | Approve and dispatch its own outgoing recommendations | Send, receive, active shipments and history |
+| Болница Света София Бургас | Itself | Advice for its own transfers only | Send, receive, active shipments and history |
+| Ministry of Health (Admin) | Network risk monitoring | Read-only | Network monitoring only |
+
+The mock network has three facilities. The Burgas hospital belongs to the Stara Zagora regional center.
+All state lives in this browser's localStorage under `b-life:app-state`; there is no server database.
+Version 2 automatically replaces the previous demo data on first load. Reset controls are not exposed in the interface.
+The account switcher is a demo role selector, not production authentication, and separate browsers do not share state.
+
+Plan a shipment to reserve units, then dispatch it from **Моите активни пратки**, or choose **Изпращане сега**.
+Only the sender can dispatch; only the recipient can mark an in-transit shipment received.
+Inventory is deducted on dispatch and credited once on receipt. Simulated arrival waits for receipt confirmation.
+The map uses the existing Mapbox integration.
+
+Validation: `npm test`, `npm run lint`, and `npm run build`.
+
 <hr>
 
 <h3><B>Cloning the repository:</B></h3>

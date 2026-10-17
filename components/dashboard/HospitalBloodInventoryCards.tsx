@@ -1,3 +1,4 @@
+import { RISK_LABELS } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -15,12 +16,7 @@ const riskBadgeClassNames: Record<RiskLevel, string> = {
   critical: "border-rose-200 bg-rose-50 text-rose-700",
 };
 
-const riskBadgeLabels: Record<RiskLevel, string> = {
-  safe: "safe",
-  elevated: "warning",
-  high: "risk",
-  critical: "risk",
-};
+const riskBadgeLabels = RISK_LABELS;
 
 const riskMeshColors: Record<
   RiskLevel,
@@ -102,7 +98,7 @@ export function HospitalBloodInventoryCards({ hospital, forecasts, onSelectBlood
                   }}
                 >
                   <ArrowUpRight />
-                  <span className="sr-only">Open {bloodType} insights</span>
+                  <span className="sr-only">Подробности за {bloodType}</span>
                 </Button>
               </div>
             </CardContent>

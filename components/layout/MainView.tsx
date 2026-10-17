@@ -73,11 +73,11 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
               <SidebarMenuItem className={styles.mainViewSidebarHeaderMenuItem}>
                 <SidebarMenuButton size="lg" render={<Link href={navigation[0]?.href ?? "#"} />}>
                   <div className={styles.mainViewSidebarBrandLogo}>
-                    <Image src={logo} alt="B.Life logo" width={24} height={24} className="size-5 object-contain" />
+                    <Image src={logo} alt="Лого на B.Life" width={24} height={24} className="size-5 object-contain" />
                   </div>
                   <div className={`grid flex-1 text-left text-sm leading-tight ${styles.mainViewSidebarBrandText}`}>
                     <span className="truncate font-medium">B.Life</span>
-                    <span className="truncate text-xs">Hospital Workspace</span>
+                    <span className="truncate text-xs">{login.role}</span>
                   </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -88,7 +88,7 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+            <SidebarGroupLabel>Навигация</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {navigation.map((item) => {
@@ -141,7 +141,7 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
                   {(login.switchOptions?.length || login.onLogout || login.logoutHref) && <DropdownMenuSeparator />}
                   {login.switchOptions?.length ? (
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>Switch hospital</DropdownMenuSubTrigger>
+                      <DropdownMenuSubTrigger>Смяна на акаунт</DropdownMenuSubTrigger>
                       <DropdownMenuSubContent className={styles.mainViewSidebarDropdownSubContent}>
                         {login.switchOptions.map((option) => (
                           <DropdownMenuItem
@@ -169,7 +169,7 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
                       }}
                     >
                       <LogOut className="size-4" />
-                      Log out
+                      Изход
                     </DropdownMenuItem>
                   ) : null}
                 </DropdownMenuContent>

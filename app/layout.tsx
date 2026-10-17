@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "B.Life | Blood Supply Command Center",
+  title: "B.Life | Управление на кръвоснабдяването",
   description:
-    "B.Life is a blood supply chain orchestration platform for hospitals and regional control towers.",
+    "B.Life свързва националния и регионалните центрове по трансфузионна хематология, болниците и Министерството на здравеопазването.",
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="bg" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full bg-slate-50 text-slate-900">
         <TooltipProvider>{children}</TooltipProvider>
       </body>

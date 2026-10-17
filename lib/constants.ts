@@ -1,8 +1,8 @@
 import { BLOOD_TYPES, type PriorityLevel, type RiskLevel, type ShipmentStatus } from "@/types/domain";
 
 export const APP_NAME = "B.Life";
-export const APP_TAGLINE = "Autonomous Blood Supply Command Center";
-export const APP_STATE_VERSION = "1.0.0";
+export const APP_TAGLINE = "Център за управление на кръвоснабдяването";
+export const APP_STATE_VERSION = "2.0.0";
 export const STORAGE_KEY = "b-life:app-state";
 
 export const BLOOD_TYPE_LIST = BLOOD_TYPES;
@@ -55,25 +55,25 @@ export interface HolidayDemandRule {
 
 export const HOLIDAY_DEMAND_RULES: HolidayDemandRule[] = [
   {
-    name: "New Year Period",
+    name: "Новогодишни празници",
     start: "12-30",
     end: "01-02",
     bloodTypeMultipliers: { "O-": 1.22, "O+": 1.14, "A-": 1.06 },
   },
   {
-    name: "St George Day Period",
+    name: "Гергьовден",
     start: "05-04",
     end: "05-07",
     bloodTypeMultipliers: { "O-": 1.18, "O+": 1.1, "B+": 1.07 },
   },
   {
-    name: "Unification Day Period",
+    name: "Ден на Съединението",
     start: "09-04",
     end: "09-08",
     bloodTypeMultipliers: { "O-": 1.15, "O+": 1.08, "A+": 1.06 },
   },
   {
-    name: "Winter Holidays",
+    name: "Зимни празници",
     start: "12-22",
     end: "12-27",
     bloodTypeMultipliers: { "O-": 1.2, "O+": 1.12, "AB+": 1.09 },

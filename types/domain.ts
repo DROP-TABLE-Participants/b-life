@@ -8,6 +8,8 @@ export type HospitalStatus = "stable" | "strained" | "critical";
 
 export type CapacityLevel = "low" | "medium" | "high";
 
+export type FacilityKind = "national_center" | "regional_center" | "hospital";
+
 export type ShipmentStatus =
   | "planned"
   | "approved"
@@ -38,6 +40,8 @@ export interface RiskByBloodType {
 
 export interface Hospital {
   id: string;
+  kind: FacilityKind;
+  regionalCenterId?: string;
   name: string;
   city: string;
   coordinates: [number, number];
@@ -54,6 +58,7 @@ export interface Hospital {
 
 export interface Shipment {
   id: string;
+  recommendationId?: string;
   fromHospitalId: string;
   toHospitalId: string;
   bloodType: BloodType;
@@ -114,7 +119,7 @@ export interface SystemKPI {
 }
 
 export interface SessionState {
-  mode: "hospital" | "control_tower" | null;
+  mode: FacilityKind | "control_tower" | null;
   hospitalId: string | null;
 }
 

@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { PRIORITY_LABELS, RISK_LABELS, SHIPMENT_STATUS_LABELS, RECOMMENDATION_STATUS_LABELS } from "@/lib/labels";
+
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShipmentMapCanvas } from "@/components/map/ShipmentMapCanvas";
-import { BLOOD_TYPE_LIST } from "@/lib/constants";
 import { cn, formatHospitalLabel, formatMinutes } from "@/lib/utils";
-import type { Forecast, Hospital, ManualShipmentDraft, Shipment, SystemKPI, TransferRecommendation } from "@/types/domain";
+import type { Forecast, Hospital, Shipment, SystemKPI, TransferRecommendation } from "@/types/domain";
 import surfaceStyles from "./DashboardCardSurface.module.css";
 import styles from "./ControlTowerDashboardView.module.css";
 
@@ -35,10 +35,6 @@ interface ControlTowerDashboardViewProps {
   shipments: Shipment[];
   recommendations: TransferRecommendation[];
   kpis: SystemKPI;
-  onApproveRecommendation: (id: string) => void;
-  onDispatchRecommendation: (id: string) => void;
-  onScheduleManualShipment: (draft: ManualShipmentDraft) => void;
-  onResetDemoData: () => void;
 }
 
 export function ControlTowerDashboardView({
@@ -47,19 +43,7 @@ export function ControlTowerDashboardView({
   shipments,
   recommendations,
   kpis,
-  onApproveRecommendation,
-  onDispatchRecommendation,
-  onScheduleManualShipment,
-  onResetDemoData,
 }: ControlTowerDashboardViewProps) {
-  const [fromHospitalId, setFromHospitalId] = useState(hospitals[0]?.id ?? "");
-  const [toHospitalId, setToHospitalId] = useState(hospitals[1]?.id ?? hospitals[0]?.id ?? "");
-  const [bloodType, setBloodType] = useState<Shipment["bloodType"]>(BLOOD_TYPE_LIST[0]);
-  const [quantity, setQuantity] = useState(8);
-  const [etaMinutes, setEtaMinutes] = useState(90);
-  const [priority, setPriority] = useState<Shipment["priority"]>("high");
-  const [status, setStatus] = useState<ManualShipmentDraft["status"]>("planned");
-
   const topShortages = useMemo(
     () => [...forecasts].sort((a, b) => b.shortageRiskScore - a.shortageRiskScore).slice(0, 6),
     [forecasts],
@@ -75,59 +59,37 @@ export function ControlTowerDashboardView({
     [shipments],
   );
 
-  const destinationOptions = useMemo(
-    () => hospitals.filter((hospital) => hospital.id !== fromHospitalId),
-    [fromHospitalId, hospitals],
-  );
-
-  const submitManualShipment = () => {
-    if (!fromHospitalId || !toHospitalId || fromHospitalId === toHospitalId) return;
-
-    onScheduleManualShipment({
-      fromHospitalId,
-      toHospitalId,
-      bloodType,
-      quantity,
-      etaMinutes,
-      priority,
-      status,
-    });
-  };
-
   return (
     <div className={styles.controlTowerDashboard}>
       <section className={`${styles.controlTowerDashboardSection} ${styles.controlTowerDashboardHeadingSection}`}>
         <div>
-          <h2 className={styles.controlTowerDashboardHeading}>Regional Control Tower</h2>
-          <p className={styles.controlTowerDashboardSubtitle}>Network-wide blood supply orchestration</p>
+          <h2 className={styles.controlTowerDashboardHeading}>Министерство на здравеопазването</h2>
+          <p className={styles.controlTowerDashboardSubtitle}>Наблюдение на мрежата · Достъп само за преглед</p>
         </div>
-        <Button type="button" variant="outline" onClick={onResetDemoData}>
-          Reset Demo Data
-        </Button>
       </section>
 
       <section className={`${styles.controlTowerDashboardSection} ${styles.controlTowerDashboardMetricsSection}`}>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardMetricCard)}>
           <CardContent className={styles.controlTowerDashboardMetricContent}>
-            <p className={styles.controlTowerDashboardMetricLabel}>Hospitals</p>
+            <p className={styles.controlTowerDashboardMetricLabel}>Центрове и болници</p>
             <p className={styles.controlTowerDashboardMetricValue}>{kpis.totalHospitals}</p>
           </CardContent>
         </Card>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardMetricCard)}>
           <CardContent className={styles.controlTowerDashboardMetricContent}>
-            <p className={styles.controlTowerDashboardMetricLabel}>Active shipments</p>
+            <p className={styles.controlTowerDashboardMetricLabel}>Активни пратки</p>
             <p className={styles.controlTowerDashboardMetricValue}>{kpis.activeShipments}</p>
           </CardContent>
         </Card>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardMetricCard)}>
           <CardContent className={styles.controlTowerDashboardMetricContent}>
-            <p className={styles.controlTowerDashboardMetricLabel}>Critical shortages</p>
+            <p className={styles.controlTowerDashboardMetricLabel}>Критични недостизи</p>
             <p className={styles.controlTowerDashboardMetricValue}>{kpis.criticalShortages}</p>
           </CardContent>
         </Card>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardMetricCard)}>
           <CardContent className={styles.controlTowerDashboardMetricContent}>
-            <p className={styles.controlTowerDashboardMetricLabel}>Expiring risk</p>
+            <p className={styles.controlTowerDashboardMetricLabel}>Риск от изтичане на срока</p>
             <p className={styles.controlTowerDashboardMetricValue}>{kpis.expiringUnitsRisk}</p>
           </CardContent>
         </Card>
@@ -136,7 +98,7 @@ export function ControlTowerDashboardView({
       <section className={styles.controlTowerDashboardSection}>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
           <CardHeader className={styles.controlTowerDashboardCardHeader}>
-            <CardTitle className={styles.controlTowerDashboardCardTitle}>Risk Heatmap</CardTitle>
+            <CardTitle className={styles.controlTowerDashboardCardTitle}>Карта на риска</CardTitle>
           </CardHeader>
           <div className={styles.controlTowerDashboardMapWrap}>
             <ShipmentMapCanvas
@@ -153,7 +115,7 @@ export function ControlTowerDashboardView({
       <section className={`${styles.controlTowerDashboardSection} ${styles.controlTowerDashboardMiddleRow}`}>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
           <CardHeader className={styles.controlTowerDashboardCardHeader}>
-            <CardTitle className={styles.controlTowerDashboardCardTitle}>Critical Shortage Ranking</CardTitle>
+            <CardTitle className={styles.controlTowerDashboardCardTitle}>Класация на критичните недостизи</CardTitle>
           </CardHeader>
           <CardContent className={styles.controlTowerDashboardCardBody}>
             <div className={styles.controlTowerDashboardList}>
@@ -166,11 +128,11 @@ export function ControlTowerDashboardView({
                         {hospital?.name} · {forecast.bloodType}
                       </p>
                       <Badge variant="outline" className={cn(urgencyBadgeClassNames[forecast.shortageRiskLevel === "critical" ? "critical" : forecast.shortageRiskLevel === "high" ? "high" : "elevated"])}>
-                        {forecast.shortageRiskLevel === "safe" ? "safe" : forecast.shortageRiskLevel === "elevated" ? "warning" : "risk"}
+                        {RISK_LABELS[forecast.shortageRiskLevel]}
                       </Badge>
                     </div>
                     <p className={styles.controlTowerDashboardListItemText}>
-                      Risk score {Math.round(forecast.shortageRiskScore)} · Demand {forecast.predictedDemand24h}u
+                      Оценка на риска {Math.round(forecast.shortageRiskScore)} · Потребност {forecast.predictedDemand24h} ед.
                     </p>
                     <p className={styles.controlTowerDashboardListItemText}>{formatHospitalLabel(hospital)}</p>
                   </div>
@@ -182,7 +144,7 @@ export function ControlTowerDashboardView({
 
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
           <CardHeader className={styles.controlTowerDashboardCardHeader}>
-            <CardTitle className={styles.controlTowerDashboardCardTitle}>Recommendation Queue</CardTitle>
+            <CardTitle className={styles.controlTowerDashboardCardTitle}>Препоръчани прехвърляния</CardTitle>
           </CardHeader>
           <CardContent className={styles.controlTowerDashboardCardBody}>
             <div className={styles.controlTowerDashboardList}>
@@ -194,7 +156,7 @@ export function ControlTowerDashboardView({
                   <div key={recommendation.id} className={styles.controlTowerDashboardListItem}>
                     <div className={styles.controlTowerDashboardListItemRow}>
                       <p className={styles.controlTowerDashboardListItemTitle}>
-                        {recommendation.bloodType} · {recommendation.suggestedQuantity}u
+                        {recommendation.bloodType} · {recommendation.suggestedQuantity} ед.
                       </p>
                       <Badge
                         variant="outline"
@@ -206,27 +168,16 @@ export function ControlTowerDashboardView({
                               : urgencyBadgeClassNames.elevated,
                         )}
                       >
-                        {recommendation.urgency}
+                        {PRIORITY_LABELS[recommendation.urgency]}
                       </Badge>
                     </div>
                     <p className={styles.controlTowerDashboardListItemText}>
-                      From {formatHospitalLabel(from)} to {formatHospitalLabel(to)}
+                      От {formatHospitalLabel(from)} до {formatHospitalLabel(to)}
                     </p>
                     <p className={styles.controlTowerDashboardListItemText}>
-                      ETA {formatMinutes(recommendation.etaMinutes)} · Confidence {recommendation.confidenceScore}%
+                      Очаквано пристигане {formatMinutes(recommendation.etaMinutes)} · Надеждност {recommendation.confidenceScore}%
                     </p>
-                    <div className={styles.controlTowerDashboardListItemActions}>
-                      {recommendation.status === "pending_approval" ? (
-                        <Button type="button" variant="secondary" size="sm" onClick={() => onApproveRecommendation(recommendation.id)}>
-                          Approve
-                        </Button>
-                      ) : null}
-                      {recommendation.status === "approved" ? (
-                        <Button type="button" variant="outline" size="sm" onClick={() => onDispatchRecommendation(recommendation.id)}>
-                          Dispatch
-                        </Button>
-                      ) : null}
-                    </div>
+                    <p className={styles.controlTowerDashboardListItemText}>{RECOMMENDATION_STATUS_LABELS[recommendation.status]}</p>
                   </div>
                 );
               })}
@@ -238,7 +189,7 @@ export function ControlTowerDashboardView({
       <section className={styles.controlTowerDashboardSection}>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.controlTowerDashboardCard)}>
           <CardHeader className={styles.controlTowerDashboardCardHeader}>
-            <CardTitle className={styles.controlTowerDashboardCardTitle}>Shipment Monitoring</CardTitle>
+            <CardTitle className={styles.controlTowerDashboardCardTitle}>Наблюдение на пратките</CardTitle>
           </CardHeader>
           <CardContent className={styles.controlTowerDashboardCardBody}>
             <div className={styles.controlTowerDashboardShipmentsGrid}>
@@ -250,17 +201,17 @@ export function ControlTowerDashboardView({
                   <div key={shipment.id} className={styles.controlTowerDashboardListItem}>
                     <div className={styles.controlTowerDashboardListItemRow}>
                       <p className={styles.controlTowerDashboardListItemTitle}>
-                        {shipment.bloodType} · {shipment.quantity}u
+                        {shipment.bloodType} · {shipment.quantity} ед.
                       </p>
                       <Badge variant="outline" className={shipmentStatusClassNames[shipment.status]}>
-                        {shipment.status.replaceAll("_", " ")}
+                        {SHIPMENT_STATUS_LABELS[shipment.status]}
                       </Badge>
                     </div>
                     <p className={styles.controlTowerDashboardListItemText}>
-                      From {formatHospitalLabel(from)} to {formatHospitalLabel(to)}
+                      От {formatHospitalLabel(from)} до {formatHospitalLabel(to)}
                     </p>
                     <p className={styles.controlTowerDashboardListItemText}>
-                      {Math.round(shipment.progress * 100)}% progress · ETA {formatMinutes(shipment.etaMinutes)}
+                      {Math.round(shipment.progress * 100)}% напредък · Очаквано пристигане {formatMinutes(shipment.etaMinutes)}
                     </p>
                   </div>
                 );

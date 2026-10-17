@@ -3,7 +3,7 @@ import { clamp, toRiskLevel } from "@/lib/utils";
 import type { AppState, BloodType, Forecast, Hospital, RiskByBloodType, Shipment, SimulationSettings, SystemKPI } from "@/types/domain";
 
 const PROGRESSIVE_INBOUND = new Set(["in_transit", "delayed"]);
-const ACTIVE_OUTBOUND = new Set(["approved", "planned", "in_transit", "delayed"]);
+const ACTIVE_OUTBOUND = new Set(["approved", "planned"]);
 const SERVICE_LEVEL_Z = 1.28;
 
 const demandMultiplierByCapacity: Record<Hospital["capacityLevel"], number> = {
@@ -13,9 +13,9 @@ const demandMultiplierByCapacity: Record<Hospital["capacityLevel"], number> = {
 };
 
 const trendFactorForCity = (city: string): number => {
-  if (city === "Sofia") return 1.22;
-  if (city === "Plovdiv") return 1.1;
-  if (city === "Varna") return 1.08;
+  if (city === "София") return 1.22;
+  if (city === "Стара Загора") return 1.1;
+  if (city === "Бургас") return 1.08;
   return 1;
 };
 
@@ -80,10 +80,6 @@ const sumInboundUnits = (hospitalId: string, bloodType: BloodType, shipments: Sh
   shipments
     .filter((shipment) => shipment.bloodType === bloodType && shipment.toHospitalId === hospitalId)
     .reduce((sum, shipment) => {
-      if (shipment.status === "delivered") {
-        return sum + shipment.quantity * PRIORITY_WEIGHTS[shipment.priority];
-      }
-
       if (PROGRESSIVE_INBOUND.has(shipment.status)) {
         // Keep inbound impact conservative until units are actually received.
         const progressWeight = clamp(shipment.progress, 0, 1) * 0.35;
@@ -101,7 +97,7 @@ const sumOutboundUnits = (hospitalId: string, bloodType: BloodType, shipments: S
         shipment.fromHospitalId === hospitalId &&
         ACTIVE_OUTBOUND.has(shipment.status),
     )
-    .reduce((sum, shipment) => sum + shipment.quantity * PRIORITY_WEIGHTS[shipment.priority], 0);
+    .reduce((sum, shipment) => sum + shipment.quantity, 0);
 
 export const runForecastingEngine = (
   hospitals: Hospital[],
@@ -147,21 +143,21 @@ export const runForecastingEngine = (
       const surplusRiskScore = clamp(surplusRiskProbability * 100 + (safetyGap < 0 ? Math.min(12, Math.abs(safetyGap) / 4) : 0), 0, 100);
 
       const topFactors = [
-        `Available 3d ${Math.round(available3d)}u vs required ${Math.round(requiredStock3d)}u`,
-        `Demand outlook mu3 ${Math.round(mu3)}u ±${Math.round(sigma3)}u`,
-        `Inbound ${Math.round(inboundUnits)}u / Outbound ${Math.round(outboundUnits)}u`,
+        `Наличност за 3 дни: ${Math.round(available3d)} ед. при необходими ${Math.round(requiredStock3d)} ед.`,
+        `Прогнозна потребност: ${Math.round(mu3)} ед. ±${Math.round(sigma3)} ед.`,
+        `Входящи: ${Math.round(inboundUnits)} ед. / Изходящи: ${Math.round(outboundUnits)} ед.`,
       ];
 
       if (holiday.multiplier > 1) {
         topFactors.push(
-          `${holiday.label ?? "Holiday demand period"} +${((holiday.multiplier - 1) * 100).toFixed(0)}%`,
+          `${holiday.label ?? "Празничен период"} +${((holiday.multiplier - 1) * 100).toFixed(0)}%`,
         );
       }
       if (cityFactor > 1) {
-        topFactors.push(`Regional demand multiplier ${(cityFactor * 100).toFixed(0)}%`);
+        topFactors.push(`Регионален коефициент на потребност: ${(cityFactor * 100).toFixed(0)}%`);
       }
       if (seasonalFactor > 1) {
-        topFactors.push(`Weekend trauma uplift ${(seasonalFactor * 100).toFixed(0)}%`);
+        topFactors.push(`Повишена потребност през почивните дни: ${(seasonalFactor * 100).toFixed(0)}%`);
       }
 
       return {
@@ -216,7 +212,7 @@ export const attachForecastRisksToHospitals = (hospitals: Hospital[], forecasts:
 };
 
 export const computeSystemKpis = (state: Pick<AppState, "hospitals" | "shipments" | "forecasts" | "recommendations">): SystemKPI => {
-  const activeShipments = state.shipments.filter((shipment) => ["approved", "in_transit", "delayed"].includes(shipment.status)).length;
+  const activeShipments = state.shipments.filter((shipment) => shipment.status !== "delivered" && shipment.status !== "cancelled").length;
   const criticalShortages = state.forecasts.filter((forecast) => forecast.shortageRiskLevel === "critical").length;
   const expiringUnitsRisk = state.forecasts.filter((forecast) => forecast.surplusRiskLevel === "critical").length;
 

@@ -6,12 +6,12 @@ interface KpiRibbonProps {
 }
 
 const labels: Array<[keyof SystemKPI, string]> = [
-  ["totalHospitals", "Hospitals"],
-  ["activeShipments", "Active Shipments"],
-  ["criticalShortages", "Critical Shortages"],
-  ["expiringUnitsRisk", "Expiry Risks"],
-  ["redistributionEfficiency", "Redistribution Efficiency"],
-  ["fulfilledRecommendations", "Fulfilled Plans"],
+  ["totalHospitals", "Лечебни заведения"],
+  ["activeShipments", "Активни пратки"],
+  ["criticalShortages", "Критични недостизи"],
+  ["expiringUnitsRisk", "Риск от изтичане на срока"],
+  ["redistributionEfficiency", "Ефективност на разпределението"],
+  ["fulfilledRecommendations", "Изпълнени препоръки"],
 ];
 
 export function KpiRibbon({ kpis }: KpiRibbonProps) {

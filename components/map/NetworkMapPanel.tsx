@@ -22,8 +22,8 @@ export function NetworkMapPanel({ hospitals, shipments, forecasts, highlightedHo
     <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/88 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <div>
-          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">Live Network Routing</h3>
-          <p className="text-xs text-slate-500">Animated shipment telemetry and hospital risk nodes</p>
+          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">Маршрути в реално време</h3>
+          <p className="text-xs text-slate-500">Проследяване на пратките и риска по лечебни заведения</p>
         </div>
       </div>
       <MapCanvas

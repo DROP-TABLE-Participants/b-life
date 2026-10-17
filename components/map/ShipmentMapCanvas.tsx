@@ -1,5 +1,7 @@
 "use client";
 
+import { PRIORITY_LABELS, SHIPMENT_STATUS_LABELS, MAP_LOCALE } from "@/lib/labels";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import MapView, {
@@ -736,7 +738,7 @@ export function ShipmentMapCanvas({
   if (!mapboxToken) {
     return (
       <div className="flex h-full w-full items-center justify-center rounded-[inherit] bg-slate-100 text-sm text-slate-500">
-        Missing Mapbox token
+        Липсва ключ за достъп до картата
       </div>
     );
   }
@@ -744,7 +746,7 @@ export function ShipmentMapCanvas({
   return (
     <div className="relative h-[340px] w-full overflow-hidden rounded-[inherit] sm:h-[420px] lg:h-[500px]">
       <div className="absolute left-3 top-3 z-10 hidden rounded-md border border-slate-200 bg-white/95 px-3 py-2 font-mono text-xs text-slate-700 shadow-sm sm:block">
-        Longitude: {center[0].toFixed(4)} | Latitude: {center[1].toFixed(4)} | Zoom: {zoom.toFixed(2)}
+        Географска дължина: {center[0].toFixed(4)} | Ширина: {center[1].toFixed(4)} | Мащаб: {zoom.toFixed(2)}
       </div>
 
       <button
@@ -752,13 +754,15 @@ export function ShipmentMapCanvas({
         onClick={handleReset}
         className="absolute left-3 top-14 z-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
       >
-        Reset
+        Начален изглед
       </button>
 
       <MapView
         ref={mapRef}
         mapboxAccessToken={mapboxToken}
         mapStyle="mapbox://styles/mapbox/light-v11"
+        locale={MAP_LOCALE}
+        language="bg"
         initialViewState={initialViewState}
         maxZoom={20}
         minZoom={3}
@@ -823,38 +827,38 @@ export function ShipmentMapCanvas({
                   <SheetTitle className={sheetStyles.bloodTypeSheetTitle}>{formatHospitalLabel(selectedHospital)}</SheetTitle>
                 </div>
                 <SheetDescription className={sheetStyles.bloodTypeSheetDescription}>
-                  Most important hospital signals and issues
+                  Основни показатели и рискове за лечебното заведение
                 </SheetDescription>
               </div>
             </SheetHeader>
             <div className={sheetStyles.bloodTypeSheetBody}>
               <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
                 <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
-                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Hospital Snapshot</CardTitle>
+                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Обобщение за лечебното заведение</CardTitle>
                 </CardHeader>
                 <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
                   <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Top shortage</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Най-голям недостиг</span>
                     <span className={sheetStyles.bloodTypeSheetMetricValue}>
-                      {selectedHospitalMaxShortage?.bloodType ?? "n/a"}
+                      {selectedHospitalMaxShortage?.bloodType ?? "няма данни"}
                     </span>
                   </div>
                   <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Shortage risk</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Риск от недостиг</span>
                     <span className={sheetStyles.bloodTypeSheetMetricValue}>
                       {Math.round(selectedHospitalMaxShortage?.shortageRiskScore ?? 0)}
                     </span>
                   </div>
                   <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Inbound active</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Активни входящи пратки</span>
                     <span className={sheetStyles.bloodTypeSheetMetricValue}>{selectedHospitalShipmentStats.inboundActive}</span>
                   </div>
                   <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Outbound active</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Активни изходящи пратки</span>
                     <span className={sheetStyles.bloodTypeSheetMetricValue}>{selectedHospitalShipmentStats.outboundActive}</span>
                   </div>
                   <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Delayed lanes</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Забавени маршрути</span>
                     <span className={sheetStyles.bloodTypeSheetMetricValue}>{selectedHospitalShipmentStats.delayed}</span>
                   </div>
                 </CardContent>
@@ -862,7 +866,7 @@ export function ShipmentMapCanvas({
 
               <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
                 <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
-                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Issue Signals</CardTitle>
+                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Показатели за риск</CardTitle>
                 </CardHeader>
                 <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
                   {topIssueForecasts.length > 0 ? (
@@ -871,13 +875,13 @@ export function ShipmentMapCanvas({
                         <div key={`${forecast.hospitalId}-${forecast.bloodType}`} className={sheetStyles.bloodTypeSheetBulletRow}>
                           <span className={sheetStyles.bloodTypeSheetBullet} />
                           <span className={sheetStyles.bloodTypeSheetMetricLabel}>
-                            {forecast.bloodType}: {Math.round(forecast.shortageRiskScore)} risk, demand {forecast.predictedDemand24h}u
+                            {forecast.bloodType}: {Math.round(forecast.shortageRiskScore)} риск, потребност {forecast.predictedDemand24h} ед.
                           </span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className={sheetStyles.bloodTypeSheetEmptyState}>No critical/high shortage issues.</p>
+                    <p className={sheetStyles.bloodTypeSheetEmptyState}>Няма критичен или висок риск от недостиг.</p>
                   )}
                 </CardContent>
               </Card>
@@ -885,7 +889,7 @@ export function ShipmentMapCanvas({
               {selectedHospital.alerts.length > 0 ? (
                 <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
                   <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
-                    <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Alerts</CardTitle>
+                    <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Известия</CardTitle>
                   </CardHeader>
                   <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
                     {selectedHospital.alerts.slice(0, 2).map((alert) => (
@@ -913,25 +917,25 @@ export function ShipmentMapCanvas({
             <SheetHeader className={sheetStyles.bloodTypeSheetHeader}>
               <div className={sheetStyles.bloodTypeSheetHeadingRow}>
                 <div className={sheetStyles.bloodTypeSheetTitleRow}>
-                  <SheetTitle className={sheetStyles.bloodTypeSheetTitle}>Shipment Telemetry</SheetTitle>
+                  <SheetTitle className={sheetStyles.bloodTypeSheetTitle}>Проследяване на пратката</SheetTitle>
                 </div>
                 <SheetDescription className={sheetStyles.bloodTypeSheetDescription}>
-                  {selectedShipment.bloodType} - {selectedShipment.quantity}u
+                  {selectedShipment.bloodType} - {selectedShipment.quantity} ед.
                 </SheetDescription>
               </div>
             </SheetHeader>
             <div className={sheetStyles.bloodTypeSheetBody}>
               <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
                 <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
-                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Route</CardTitle>
+                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Маршрут</CardTitle>
                 </CardHeader>
                 <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
                   <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>From</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>От</span>
                     <span className={sheetStyles.bloodTypeSheetMetricLabel}>{formatHospitalLabel(selectedShipmentFromHospital)}</span>
                   </div>
                   <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>To</span>
+                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>До</span>
                     <span className={sheetStyles.bloodTypeSheetMetricLabel}>{formatHospitalLabel(selectedShipmentToHospital)}</span>
                   </div>
                 </CardContent>
@@ -940,25 +944,25 @@ export function ShipmentMapCanvas({
               <div className={sheetStyles.bloodTypeSheetStatsGrid}>
                 <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
                   <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
-                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Status</p>
-                    <p className={sheetStyles.bloodTypeSheetStatValue}>{selectedShipment.status.replaceAll("_", " ")}</p>
+                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Състояние</p>
+                    <p className={sheetStyles.bloodTypeSheetStatValue}>{SHIPMENT_STATUS_LABELS[selectedShipment.status]}</p>
                   </CardContent>
                 </Card>
                 <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
                   <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
-                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Priority</p>
-                    <p className={sheetStyles.bloodTypeSheetStatValue}>{selectedShipment.priority}</p>
+                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Приоритет</p>
+                    <p className={sheetStyles.bloodTypeSheetStatValue}>{PRIORITY_LABELS[selectedShipment.priority]}</p>
                   </CardContent>
                 </Card>
                 <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
                   <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
-                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Progress</p>
+                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Напредък</p>
                     <p className={sheetStyles.bloodTypeSheetStatValue}>{Math.round(selectedShipment.progress * 100)}%</p>
                   </CardContent>
                 </Card>
                 <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
                   <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
-                    <p className={sheetStyles.bloodTypeSheetStatLabel}>ETA</p>
+                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Очаквано пристигане</p>
                     <p className={sheetStyles.bloodTypeSheetStatValue}>{formatMinutes(selectedShipment.etaMinutes)}</p>
                   </CardContent>
                 </Card>
@@ -970,9 +974,9 @@ export function ShipmentMapCanvas({
 
       {mode === "base" ? (
         <div className="absolute bottom-3 left-3 z-10 hidden rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-[11px] text-slate-700 shadow-sm sm:block">
-          <p className="font-semibold text-slate-900">Route Legend</p>
-          <p>cyan: in transit | amber: delayed | blue: approved | gray: planned</p>
-          <p>Click route or truck marker for shipment details.</p>
+          <p className="font-semibold text-slate-900">Легенда на маршрутите</p>
+          <p>тюркоазено: в движение | жълто: забавена | синьо: одобрена | сиво: планирана</p>
+          <p>Изберете маршрут или маркер за подробности за пратката.</p>
         </div>
       ) : null}
     </div>

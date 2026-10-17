@@ -1,5 +1,7 @@
 "use client";
 
+import { RISK_LABELS } from "@/lib/labels";
+
 import {
   CartesianGrid,
   Line,
@@ -31,12 +33,7 @@ const riskBadgeClassNames: Record<RiskLevel, string> = {
   critical: "border-rose-200 bg-rose-50 text-rose-700",
 };
 
-const riskBadgeLabels: Record<RiskLevel, string> = {
-  safe: "safe",
-  elevated: "warning",
-  high: "risk",
-  critical: "risk",
-};
+const riskBadgeLabels = RISK_LABELS;
 
 interface BloodTypeInsightSheetProps {
   open: boolean;
@@ -74,9 +71,9 @@ export function BloodTypeInsightSheet({
   );
 
   const chartData = [
-    { label: "Current", value: forecast?.currentUnits ?? currentUnits },
-    { label: "Today", value: forecast?.predictedDemand24h ?? 0 },
-    { label: "48h", value: forecast?.predictedDemand48h ?? 0 },
+    { label: "Наличност", value: forecast?.currentUnits ?? currentUnits },
+    { label: "Днес", value: forecast?.predictedDemand24h ?? 0 },
+    { label: "48 ч.", value: forecast?.predictedDemand48h ?? 0 },
   ];
 
   const relatedShipments = shipments.filter((shipment) => shipment.bloodType === bloodType);
@@ -111,7 +108,10 @@ export function BloodTypeInsightSheet({
     );
 
   const estimatedUsedToday = forecast?.predictedDemand24h ?? 0;
-  const projectedBalance = currentUnits + inboundUnits - outboundUnits - estimatedUsedToday;
+  const reservedOutboundUnits = outboundShipments
+    .filter((shipment) => shipment.status === "planned" || shipment.status === "approved")
+    .reduce((total, shipment) => total + shipment.quantity, 0);
+  const projectedBalance = currentUnits + inboundUnits - reservedOutboundUnits - estimatedUsedToday;
   const projectedBalanceLabel = projectedBalance >= 0 ? `+${projectedBalance}` : `${projectedBalance}`;
 
   return (
@@ -127,7 +127,7 @@ export function BloodTypeInsightSheet({
             </div>
             <div>
               <SheetDescription className={styles.bloodTypeSheetDescription}>
-                Blood type insights for {hospital.name}
+                Информация за кръвната група в {hospital.name}
               </SheetDescription>
             </div>
           </div>
@@ -136,7 +136,7 @@ export function BloodTypeInsightSheet({
         <div className={styles.bloodTypeSheetBody}>
           <Card className={cn(surfaceStyles.dashboardCardSurface, styles.bloodTypeSheetCard)}>
             <CardHeader className={styles.bloodTypeSheetCardHeader}>
-              <CardTitle className={styles.bloodTypeSheetCardTitle}>Forecast</CardTitle>
+              <CardTitle className={styles.bloodTypeSheetCardTitle}>Прогноза</CardTitle>
             </CardHeader>
             <CardContent className={styles.bloodTypeSheetCardContent}>
               <div className={styles.bloodTypeSheetChartWrap}>
@@ -146,7 +146,7 @@ export function BloodTypeInsightSheet({
                     <XAxis dataKey="label" />
                     <YAxis domain={[0, chartMax]} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="value" stroke="#0f172a" strokeWidth={2} />
+                    <Line type="monotone" dataKey="value" name="Единици" stroke="#0f172a" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -156,54 +156,54 @@ export function BloodTypeInsightSheet({
           <div className={styles.bloodTypeSheetStatsGrid}>
             <Card className={cn(surfaceStyles.dashboardCardSurface, styles.bloodTypeSheetStatCard)}>
               <CardContent className={styles.bloodTypeSheetStatContent}>
-                <p className={styles.bloodTypeSheetStatLabel}>Current stock</p>
-                <p className={styles.bloodTypeSheetStatValue}>{currentUnits}u</p>
+                <p className={styles.bloodTypeSheetStatLabel}>Текуща наличност</p>
+                <p className={styles.bloodTypeSheetStatValue}>{currentUnits} ед.</p>
               </CardContent>
             </Card>
             <Card className={cn(surfaceStyles.dashboardCardSurface, styles.bloodTypeSheetStatCard)}>
               <CardContent className={styles.bloodTypeSheetStatContent}>
-                <p className={styles.bloodTypeSheetStatLabel}>Used today (est.)</p>
-                <p className={styles.bloodTypeSheetStatValue}>{estimatedUsedToday}u</p>
+                <p className={styles.bloodTypeSheetStatLabel}>Потребност днес (прогноза)</p>
+                <p className={styles.bloodTypeSheetStatValue}>{estimatedUsedToday} ед.</p>
               </CardContent>
             </Card>
             <Card className={cn(surfaceStyles.dashboardCardSurface, styles.bloodTypeSheetStatCard)}>
               <CardContent className={styles.bloodTypeSheetStatContent}>
-                <p className={styles.bloodTypeSheetStatLabel}>Forecast 48h</p>
-                <p className={styles.bloodTypeSheetStatValue}>{forecast?.predictedDemand48h ?? 0}u</p>
+                <p className={styles.bloodTypeSheetStatLabel}>Прогноза за 48 ч.</p>
+                <p className={styles.bloodTypeSheetStatValue}>{forecast?.predictedDemand48h ?? 0} ед.</p>
               </CardContent>
             </Card>
             <Card className={cn(surfaceStyles.dashboardCardSurface, styles.bloodTypeSheetStatCard)}>
               <CardContent className={styles.bloodTypeSheetStatContent}>
-                <p className={styles.bloodTypeSheetStatLabel}>Projected balance</p>
-                <p className={styles.bloodTypeSheetStatValue}>{projectedBalanceLabel}u</p>
+                <p className={styles.bloodTypeSheetStatLabel}>Прогнозен остатък</p>
+                <p className={styles.bloodTypeSheetStatValue}>{projectedBalanceLabel} ед.</p>
               </CardContent>
             </Card>
           </div>
 
           <Card className={cn(surfaceStyles.dashboardCardSurface, styles.bloodTypeSheetCard)}>
             <CardHeader className={styles.bloodTypeSheetCardHeader}>
-              <CardTitle className={styles.bloodTypeSheetCardTitle}>Today</CardTitle>
+              <CardTitle className={styles.bloodTypeSheetCardTitle}>Днес</CardTitle>
             </CardHeader>
             <CardContent className={styles.bloodTypeSheetListCardContent}>
               <div className={styles.bloodTypeSheetMetricRow}>
-                <span className={styles.bloodTypeSheetMetricLabel}>Forecast today</span>
-                <span className={styles.bloodTypeSheetMetricValue}>{forecast?.predictedDemand24h ?? 0}u</span>
+                <span className={styles.bloodTypeSheetMetricLabel}>Прогноза за днес</span>
+                <span className={styles.bloodTypeSheetMetricValue}>{forecast?.predictedDemand24h ?? 0} ед.</span>
               </div>
               <Separator />
               <div className={styles.bloodTypeSheetMetricRow}>
-                <span className={styles.bloodTypeSheetMetricLabel}>Inbound today</span>
-                <span className={styles.bloodTypeSheetMetricValue}>{inboundUnits}u</span>
+                <span className={styles.bloodTypeSheetMetricLabel}>Входящи днес</span>
+                <span className={styles.bloodTypeSheetMetricValue}>{inboundUnits} ед.</span>
               </div>
               <Separator />
               <div className={styles.bloodTypeSheetMetricRow}>
-                <span className={styles.bloodTypeSheetMetricLabel}>Outbound today</span>
-                <span className={styles.bloodTypeSheetMetricValue}>{outboundUnits}u</span>
+                <span className={styles.bloodTypeSheetMetricLabel}>Изходящи днес</span>
+                <span className={styles.bloodTypeSheetMetricValue}>{outboundUnits} ед.</span>
               </div>
               <Separator />
               <div className={styles.bloodTypeSheetMetricRow}>
-                <span className={styles.bloodTypeSheetMetricLabel}>Next incoming ETA</span>
+                <span className={styles.bloodTypeSheetMetricLabel}>Следващо очаквано пристигане</span>
                 <span className={styles.bloodTypeSheetMetricValue}>
-                  {nextIncomingMinutes === null ? "None" : formatMinutes(nextIncomingMinutes)}
+                  {nextIncomingMinutes === null ? "Няма" : formatMinutes(nextIncomingMinutes)}
                 </span>
               </div>
             </CardContent>
@@ -211,10 +211,10 @@ export function BloodTypeInsightSheet({
 
           <Card className={cn(surfaceStyles.dashboardCardSurface, styles.bloodTypeSheetCard)}>
             <CardHeader className={styles.bloodTypeSheetCardHeader}>
-              <CardTitle className={styles.bloodTypeSheetCardTitle}>Risk Drivers</CardTitle>
+              <CardTitle className={styles.bloodTypeSheetCardTitle}>Фактори на риска</CardTitle>
             </CardHeader>
             <CardContent className={styles.bloodTypeSheetListCardContent}>
-              {(forecast?.topFactors ?? ["No active pressure detected"]).map((factor) => (
+              {(forecast?.topFactors ?? ["Не е установен повишен риск"]).map((factor) => (
                 <div key={factor} className={styles.bloodTypeSheetBulletRow}>
                   <span className={styles.bloodTypeSheetBullet} />
                   <span className={styles.bloodTypeSheetMetricLabel}>{factor}</span>
@@ -225,32 +225,32 @@ export function BloodTypeInsightSheet({
 
           <Card className={cn(surfaceStyles.dashboardCardSurface, styles.bloodTypeSheetCard)}>
             <CardHeader className={styles.bloodTypeSheetCardHeader}>
-              <CardTitle className={styles.bloodTypeSheetCardTitle}>Recommendation</CardTitle>
+              <CardTitle className={styles.bloodTypeSheetCardTitle}>Препоръка</CardTitle>
             </CardHeader>
             <CardContent className={styles.bloodTypeSheetListCardContent}>
               {recommendation ? (
                 <>
                   <div className={styles.bloodTypeSheetMetricRow}>
-                    <span className={styles.bloodTypeSheetMetricLabel}>Suggested transfer</span>
-                    <span className={styles.bloodTypeSheetMetricValue}>{recommendation.suggestedQuantity}u</span>
+                    <span className={styles.bloodTypeSheetMetricLabel}>Препоръчано количество</span>
+                    <span className={styles.bloodTypeSheetMetricValue}>{recommendation.suggestedQuantity} ед.</span>
                   </div>
                   <Separator />
                   <div className={styles.bloodTypeSheetMetricRow}>
-                    <span className={styles.bloodTypeSheetMetricLabel}>Partner hospital</span>
+                    <span className={styles.bloodTypeSheetMetricLabel}>Партньорско заведение</span>
                     <span className={styles.bloodTypeSheetMetricValue}>
                       {formatHospitalLabel(partnerHospital)}
                     </span>
                   </div>
                   <Separator />
                   <div className={styles.bloodTypeSheetMetricRow}>
-                    <span className={styles.bloodTypeSheetMetricLabel}>ETA</span>
+                    <span className={styles.bloodTypeSheetMetricLabel}>Очаквано пристигане</span>
                     <span className={styles.bloodTypeSheetMetricValue}>{formatMinutes(recommendation.etaMinutes)}</span>
                   </div>
                   <Separator />
                   <p className={styles.bloodTypeSheetRecommendationText}>{recommendation.reason}</p>
                 </>
               ) : (
-                <p className={styles.bloodTypeSheetEmptyState}>No active recommendation for this blood type.</p>
+                <p className={styles.bloodTypeSheetEmptyState}>Няма активна препоръка за тази кръвна група.</p>
               )}
             </CardContent>
           </Card>

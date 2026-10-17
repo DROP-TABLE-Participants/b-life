@@ -57,7 +57,7 @@ export function HospitalOverview({
 
       <div className="grid gap-4 xl:grid-cols-2">
         <GlassCard>
-          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">My Active Shipments</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Моите активни пратки</h3>
           <div className="mt-3 space-y-2">
             {activeShipments.slice(0, 6).map((shipment) => {
               const fromHospital = hospitals.find((item) => item.id === shipment.fromHospitalId);
@@ -66,61 +66,61 @@ export function HospitalOverview({
               return (
                 <div key={shipment.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <p className="mb-2 text-[11px] text-slate-500">
-                    From {formatHospitalLabel(fromHospital)} to {formatHospitalLabel(toHospital)}
+                    От {formatHospitalLabel(fromHospital)} до {formatHospitalLabel(toHospital)}
                   </p>
                   <div className="flex items-center justify-between">
                     <p className="font-medium">
-                      {shipment.bloodType} · {shipment.quantity}u
+                      {shipment.bloodType} · {shipment.quantity} ед.
                     </p>
                     <StatusBadge status={shipment.status} />
                   </div>
                   <p className="mt-1 text-xs text-slate-500">
-                    {shipment.fromHospitalId === hospital.id ? "Outgoing" : "Incoming"} · ETA {Math.round(shipment.etaMinutes)}m
+                    {shipment.fromHospitalId === hospital.id ? "Изходяща" : "Входяща"} · Очаквано пристигане {Math.round(shipment.etaMinutes)} мин.
                   </p>
                   {(shipment.status === "approved" || shipment.status === "planned") && shipment.fromHospitalId === currentHospitalId && (
                     <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => onDispatchShipment(shipment.id)}>
-                      Dispatch Shipment
+                      Изпращане на пратката
                     </Button>
                   )}
-                  {shipment.status !== "delivered" && shipment.toHospitalId === hospital.id && (
+                  {(shipment.status === "in_transit" || shipment.status === "delayed") && shipment.toHospitalId === hospital.id && (
                     <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => onReceiveShipment(shipment.id)}>
-                      Mark Received
+                      Потвърждаване на получаване
                     </Button>
                   )}
                 </div>
               );
             })}
-            {activeShipments.length === 0 && <p className="text-sm text-slate-300">No active shipments.</p>}
+            {activeShipments.length === 0 && <p className="text-sm text-slate-300">Няма активни пратки.</p>}
           </div>
         </GlassCard>
 
         <GlassCard>
-          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Recommended Transfers</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Препоръчани прехвърляния</h3>
           <div className="mt-3 space-y-2">
             {myRecommendations.slice(0, 6).map((recommendation) => (
               <div key={recommendation.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium">
-                    {recommendation.bloodType} · {recommendation.suggestedQuantity}u
+                    {recommendation.bloodType} · {recommendation.suggestedQuantity} ед.
                   </p>
                   <StatusBadge status={recommendation.urgency === "critical" ? "critical" : recommendation.urgency === "high" ? "high" : "elevated"} />
                 </div>
                 <p className="mt-1 text-xs text-slate-500">{recommendation.reason}</p>
                 <div className="mt-2 flex gap-2">
-                  {recommendation.fromHospitalId === currentHospitalId && recommendation.status === "pending_approval" && (
+                  {hospital.kind !== "hospital" && recommendation.fromHospitalId === currentHospitalId && recommendation.status === "pending_approval" && (
                     <Button type="button" variant="secondary" size="sm" onClick={() => onApproveRecommendation(recommendation.id)}>
-                      Approve
+                      Одобряване
                     </Button>
                   )}
-                  {recommendation.fromHospitalId === currentHospitalId && recommendation.status === "approved" && (
+                  {hospital.kind !== "hospital" && recommendation.fromHospitalId === currentHospitalId && recommendation.status === "approved" && (
                     <Button type="button" variant="default" size="sm" onClick={() => onDispatchRecommendation(recommendation.id)}>
-                      Dispatch
+                      Изпращане
                     </Button>
                   )}
                 </div>
               </div>
             ))}
-            {myRecommendations.length === 0 && <p className="text-sm text-slate-300">No recommendations at this time.</p>}
+            {myRecommendations.length === 0 && <p className="text-sm text-slate-300">В момента няма препоръки.</p>}
           </div>
         </GlassCard>
       </div>

@@ -1,3 +1,4 @@
+import { RISK_LABELS, SHIPMENT_STATUS_LABELS } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_COLORS } from "@/lib/constants";
 import type { RiskLevel, ShipmentStatus } from "@/types/domain";
@@ -18,7 +19,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
 
   return (
     <Badge className={classes}>
-      {status.replaceAll("_", " ")}
+      {status in SHIPMENT_STATUS_LABELS ? SHIPMENT_STATUS_LABELS[status as ShipmentStatus] : RISK_LABELS[status as RiskLevel]}
     </Badge>
   );
 }

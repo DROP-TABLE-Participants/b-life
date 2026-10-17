@@ -1,4 +1,4 @@
-import { APP_STATE_VERSION, STORAGE_KEY } from "@/lib/constants";
+import { APP_STATE_VERSION, BLOOD_TYPE_LIST, STORAGE_KEY } from "@/lib/constants";
 import { createSeedAppState } from "@/lib/seed";
 import type { AppState } from "@/types/domain";
 
@@ -9,7 +9,20 @@ const safeParse = (value: string): AppState | null => {
     const parsed = JSON.parse(value) as AppState;
     if (!parsed || typeof parsed !== "object") return null;
     if (parsed.version !== APP_STATE_VERSION) return null;
-    if (!Array.isArray(parsed.hospitals) || !Array.isArray(parsed.shipments)) return null;
+    if (!Array.isArray(parsed.hospitals) || parsed.hospitals.length === 0 || !Array.isArray(parsed.shipments) || !Array.isArray(parsed.recommendations)) return null;
+    if (!parsed.hospitals.every((facility) => facility && typeof facility.id === "string" &&
+      ["national_center", "regional_center", "hospital"].includes(facility.kind) &&
+      Array.isArray(facility.coordinates) && facility.coordinates.length === 2 &&
+      BLOOD_TYPE_LIST.every((type) => Number.isFinite(facility.inventoryByBloodType?.[type]) && facility.inventoryByBloodType[type] >= 0))) return null;
+    const facilityIds = new Set(parsed.hospitals.map((item) => item.id));
+    if (!parsed.shipments.every((item) => item && facilityIds.has(item.fromHospitalId) && facilityIds.has(item.toHospitalId) &&
+      BLOOD_TYPE_LIST.includes(item.bloodType) && Number.isInteger(item.quantity) && item.quantity > 0 &&
+      ["planned", "approved", "in_transit", "delayed", "delivered", "cancelled"].includes(item.status))) return null;
+    const sessionFacility = parsed.hospitals.find((item) => item.id === parsed.session?.hospitalId);
+    if (!parsed.session || !((parsed.session.mode === null && parsed.session.hospitalId === null) ||
+      (parsed.session.mode === "control_tower" && parsed.session.hospitalId === null) || sessionFacility?.kind === parsed.session.mode)) {
+      parsed.session = { mode: null, hospitalId: null };
+    }
     if (!parsed.simulation) {
       parsed.simulation = {
         currentDate: new Date().toISOString(),

@@ -25,7 +25,7 @@ export function SimulationControlPanel({
     <GlassCard className="bg-gradient-to-br from-slate-900/80 via-slate-900/65 to-cyan-950/40">
       <div className="grid gap-4 md:grid-cols-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-cyan-200/80">Simulation Date</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-cyan-200/80">Дата на прогнозата</p>
           <Input
             type="datetime-local"
             value={dateInputValue}
@@ -36,10 +36,10 @@ export function SimulationControlPanel({
             }}
             className="mt-2"
           />
-          <p className="mt-2 text-xs text-slate-400">Holiday periods are modeled automatically from this date.</p>
+          <p className="mt-2 text-xs text-slate-400">Празничните периоди се отчитат автоматично спрямо избраната дата.</p>
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-cyan-200/80">Demand Pressure ×{demandMultiplier.toFixed(2)}</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-cyan-200/80">Коефициент на потребност ×{demandMultiplier.toFixed(2)}</p>
           <input
             type="range"
             min={SIMULATION_BOUNDS.demandMultiplier.min}
@@ -51,7 +51,7 @@ export function SimulationControlPanel({
           />
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-cyan-200/80">Truck Speed ×{shipmentSpeed.toFixed(2)}</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-cyan-200/80">Скорост на транспорта ×{shipmentSpeed.toFixed(2)}</p>
           <input
             type="range"
             min={SIMULATION_BOUNDS.shipmentSpeed.min}

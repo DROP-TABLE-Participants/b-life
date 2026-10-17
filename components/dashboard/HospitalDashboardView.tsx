@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { PRIORITY_LABELS, SHIPMENT_STATUS_LABELS, RECOMMENDATION_STATUS_LABELS } from "@/lib/labels";
+
+import { useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -12,13 +14,15 @@ import {
 } from "recharts";
 import { BloodTypeInsightSheet } from "@/components/dashboard/BloodTypeInsightSheet";
 import { HospitalBloodInventoryCards } from "@/components/dashboard/HospitalBloodInventoryCards";
+import { ShipmentComposer } from "@/components/dashboard/ShipmentComposer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShipmentMapCanvas } from "@/components/map/ShipmentMapCanvas";
 import { cn, formatHospitalLabel } from "@/lib/utils";
-import { BLOOD_TYPES, type Forecast, type Hospital, type Shipment, type TransferRecommendation } from "@/types/domain";
+import { forecastFacilities, visibleRecommendations } from "@/lib/access";
+import { BLOOD_TYPES, type Forecast, type Hospital, type ManualShipmentDraft, type Shipment, type TransferRecommendation } from "@/types/domain";
 import surfaceStyles from "./DashboardCardSurface.module.css";
 import styles from "./HospitalDashboardView.module.css";
 
@@ -43,6 +47,7 @@ interface HospitalDashboardViewProps {
   onDispatchRecommendation: (id: string) => void;
   onDispatchShipment: (shipmentId: string) => void;
   onReceiveShipment: (shipmentId: string) => void;
+  onScheduleManualShipment: (draft: ManualShipmentDraft) => boolean;
 }
 
 export function HospitalDashboardView({
@@ -56,42 +61,48 @@ export function HospitalDashboardView({
   onDispatchRecommendation,
   onDispatchShipment,
   onReceiveShipment,
+  onScheduleManualShipment,
 }: HospitalDashboardViewProps) {
   const [selectedForecast, setSelectedForecast] = useState<(typeof FORECAST_OPTIONS)[number]>("all");
   const [selectedBloodType, setSelectedBloodType] = useState<(typeof BLOOD_TYPES)[number] | null>(null);
+  const [forecastFacilityId, setForecastFacilityId] = useState(hospital.id);
+  const [shipmentTab, setShipmentTab] = useState<"active" | "history">("active");
 
   const hospitalForecasts = forecasts.filter((forecast) => forecast.hospitalId === hospital.id);
+  const scopedFacilities = forecastFacilities(hospital, hospitals);
+  const selectedFacility = scopedFacilities.find((item) => item.id === forecastFacilityId) ?? hospital;
+  const selectedFacilityForecasts = forecasts.filter((forecast) => forecast.hospitalId === selectedFacility.id);
 
   const chartColor = selectedForecast === "all" ? "#0f172a" : selectedForecast.endsWith("-") ? "#f43f5e" : "#0ea5e9";
 
-  const chartData = useMemo(() => {
+  const chartData = (() => {
     const selectedForecasts =
       selectedForecast === "all"
-        ? hospitalForecasts
-        : hospitalForecasts.filter((forecast) => forecast.bloodType === selectedForecast);
+        ? selectedFacilityForecasts
+        : selectedFacilityForecasts.filter((forecast) => forecast.bloodType === selectedForecast);
 
     const sumField = (field: keyof Pick<Forecast, "currentUnits" | "predictedDemand24h" | "predictedDemand48h">) =>
       selectedForecasts.reduce((total, forecast) => total + forecast[field], 0);
 
     return [
       {
-        label: "Current",
+        label: "Наличност",
         value: sumField("currentUnits"),
       },
       {
-        label: "24h",
+        label: "24 ч.",
         value: sumField("predictedDemand24h"),
       },
       {
-        label: "48h",
+        label: "48 ч.",
         value: sumField("predictedDemand48h"),
       },
     ];
-  }, [hospitalForecasts, selectedForecast]);
+  })();
 
-  const myRecommendations = recommendations.filter(
-    (recommendation) => recommendation.toHospitalId === hospital.id || recommendation.fromHospitalId === hospital.id,
-  );
+  const myRecommendations = visibleRecommendations(hospital, hospitals, recommendations)
+    .filter((item) => item.status !== "fulfilled" && item.status !== "cancelled");
+  const canManageRecommendations = hospital.kind !== "hospital";
 
   const dispatchShipments = shipments.filter(
     (shipment) =>
@@ -102,6 +113,8 @@ export function HospitalDashboardView({
   const activeShipments = dispatchShipments.filter(
     (shipment) => shipment.status !== "delivered" && shipment.status !== "cancelled",
   );
+  const historyShipments = dispatchShipments.filter((shipment) => shipment.status === "delivered" || shipment.status === "cancelled");
+  const displayedShipments = shipmentTab === "active" ? activeShipments : historyShipments;
 
   return (
     <div className={styles.hospitalDashboard}>
@@ -120,24 +133,31 @@ export function HospitalDashboardView({
       <section className={`${styles.hospitalDashboardSection} ${styles.hospitalDashboardMiddleRow}`}>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.hospitalDashboardCard)}>
           <CardHeader className={styles.hospitalDashboardCardHeader}>
-            <CardTitle className={styles.hospitalDashboardCardTitle}>Forecast</CardTitle>
+            <CardTitle className={styles.hospitalDashboardCardTitle}>Прогноза</CardTitle>
             <Select
               value={selectedForecast}
               onValueChange={(value) => setSelectedForecast(value as (typeof FORECAST_OPTIONS)[number])}
             >
               <SelectTrigger className={styles.hospitalDashboardSelectTrigger}>
-                <SelectValue placeholder="Select blood type" />
+                <SelectValue placeholder="Изберете кръвна група" />
               </SelectTrigger>
               <SelectContent>
                 {FORECAST_OPTIONS.map((option) => (
                   <SelectItem key={option} value={option}>
-                    {option === "all" ? "All" : option}
+                    {option === "all" ? "Всички" : option}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </CardHeader>
           <CardContent className={`${styles.hospitalDashboardCardBody} ${styles.hospitalDashboardChartWrap}`}>
+            {scopedFacilities.length > 1 ? (
+              <label className="mb-4 grid gap-2 text-sm">Прогноза за
+                <select className="h-9 w-full rounded-md border border-input bg-background px-3" value={selectedFacility.id} onChange={(event) => setForecastFacilityId(event.target.value)}>
+                  {scopedFacilities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+            ) : <p className="mb-4 text-sm text-muted-foreground">Прогнозна потребност от кръв за Вашата болница</p>}
             <div className={styles.hospitalDashboardChartArea}>
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={chartData}>
@@ -145,24 +165,34 @@ export function HospitalDashboardView({
                   <XAxis dataKey="label" />
                   <YAxis />
                   <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke={chartColor} strokeWidth={2} />
+                  <Line type="monotone" dataKey="value" name="Единици" stroke={chartColor} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <caption className="pb-2 text-left text-muted-foreground">{selectedFacility.name} · прогнозна потребност в единици</caption>
+                <thead><tr><th className="py-2">Кръвна група</th><th>Наличност</th><th>Потребност за 24 ч.</th><th>Потребност за 48 ч.</th></tr></thead>
+                <tbody>{selectedFacilityForecasts.filter((item) => selectedForecast === "all" || item.bloodType === selectedForecast).map((item) => (
+                  <tr key={item.bloodType} className="border-t"><td className="py-2 font-medium">{item.bloodType}</td><td>{item.currentUnits}</td><td>{item.predictedDemand24h}</td><td>{item.predictedDemand48h}</td></tr>
+                ))}</tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
 
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.hospitalDashboardCard)}>
           <CardHeader className={styles.hospitalDashboardCardHeader}>
-            <CardTitle className={styles.hospitalDashboardCardTitle}>Recommended Transfers</CardTitle>
+            <CardTitle className={styles.hospitalDashboardCardTitle}>Препоръчани прехвърляния</CardTitle>
           </CardHeader>
           <CardContent className={styles.hospitalDashboardCardBody}>
+            {!canManageRecommendations && <p className="mb-3 text-sm text-muted-foreground">Препоръки за Вашата болница. Прехвърлянията се одобряват от изпращащия център.</p>}
             <div className={styles.hospitalDashboardTransfers}>
               {myRecommendations.map((recommendation) => (
                 <div key={recommendation.id} className={styles.hospitalDashboardTransferItem}>
                   <div className={styles.hospitalDashboardTransferTitleRow}>
                     <p className={styles.hospitalDashboardTransferTitle}>
-                      {recommendation.bloodType} · {recommendation.suggestedQuantity}u
+                      {recommendation.bloodType} · {recommendation.suggestedQuantity} ед.
                     </p>
                     <Badge
                       className={cn(
@@ -174,12 +204,13 @@ export function HospitalDashboardView({
                       )}
                       variant="outline"
                     >
-                      {recommendation.urgency}
+                      {PRIORITY_LABELS[recommendation.urgency]}
                     </Badge>
                   </div>
                   <p className={styles.hospitalDashboardTransferText}>{recommendation.reason}</p>
+                  <p className={styles.hospitalDashboardTransferText}>{RECOMMENDATION_STATUS_LABELS[recommendation.status]}</p>
                   <div className={styles.hospitalDashboardTransferActions}>
-                    {recommendation.fromHospitalId === currentHospitalId &&
+                    {canManageRecommendations && recommendation.fromHospitalId === currentHospitalId &&
                       recommendation.status === "pending_approval" && (
                         <Button
                           type="button"
@@ -188,10 +219,10 @@ export function HospitalDashboardView({
                           className={styles.hospitalDashboardButton}
                           onClick={() => onApproveRecommendation(recommendation.id)}
                         >
-                          Approve
+                          Одобряване
                         </Button>
                       )}
-                    {recommendation.fromHospitalId === currentHospitalId &&
+                    {canManageRecommendations && recommendation.fromHospitalId === currentHospitalId &&
                       recommendation.status === "approved" && (
                         <Button
                           type="button"
@@ -200,12 +231,13 @@ export function HospitalDashboardView({
                           className={styles.hospitalDashboardButton}
                           onClick={() => onDispatchRecommendation(recommendation.id)}
                         >
-                          Dispatch
+                          Изпращане
                         </Button>
                       )}
                   </div>
                 </div>
               ))}
+              {myRecommendations.length === 0 && <p className={styles.hospitalDashboardTransferText}>В момента няма препоръчани прехвърляния.</p>}
             </div>
           </CardContent>
         </Card>
@@ -213,12 +245,25 @@ export function HospitalDashboardView({
 
       <section className={styles.hospitalDashboardSection}>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.hospitalDashboardCard)}>
+          <CardHeader className={styles.hospitalDashboardCardHeader}><CardTitle className={styles.hospitalDashboardCardTitle}>Изпращане на кръв</CardTitle></CardHeader>
+          <CardContent className={styles.hospitalDashboardCardBody}>
+            <ShipmentComposer hospital={hospital} hospitals={hospitals} shipments={shipments} onSchedule={onScheduleManualShipment} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className={styles.hospitalDashboardSection}>
+        <Card className={cn(surfaceStyles.dashboardCardSurface, styles.hospitalDashboardCard)}>
           <CardHeader className={styles.hospitalDashboardCardHeader}>
-            <CardTitle className={styles.hospitalDashboardCardTitle}>My Active Shipments</CardTitle>
+            <CardTitle className={styles.hospitalDashboardCardTitle}>{shipmentTab === "active" ? "Моите активни пратки" : "История на моите пратки"}</CardTitle>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant={shipmentTab === "active" ? "secondary" : "outline"} onClick={() => setShipmentTab("active")}>Активни ({activeShipments.length})</Button>
+              <Button type="button" size="sm" variant={shipmentTab === "history" ? "secondary" : "outline"} onClick={() => setShipmentTab("history")}>История ({historyShipments.length})</Button>
+            </div>
           </CardHeader>
           <CardContent className={styles.hospitalDashboardCardBody}>
             <div className={styles.hospitalDashboardTransfers}>
-              {activeShipments.slice(0, 8).map((shipment) => {
+              {displayedShipments.map((shipment) => {
                 const from = hospitals.find((item) => item.id === shipment.fromHospitalId);
                 const to = hospitals.find((item) => item.id === shipment.toHospitalId);
 
@@ -226,16 +271,18 @@ export function HospitalDashboardView({
                   <div key={shipment.id} className={styles.hospitalDashboardTransferItem}>
                     <div className={styles.hospitalDashboardTransferTitleRow}>
                       <p className={styles.hospitalDashboardTransferTitle}>
-                        {shipment.bloodType} · {shipment.quantity}u
+                        {shipment.bloodType} · {shipment.quantity} ед.
                       </p>
-                      <Badge variant="outline">{shipment.status.replaceAll("_", " ")}</Badge>
+                      <Badge variant="outline">{SHIPMENT_STATUS_LABELS[shipment.status]}</Badge>
                     </div>
                     <p className={styles.hospitalDashboardTransferText}>
-                      From {formatHospitalLabel(from)} to {formatHospitalLabel(to)}
+                      От {formatHospitalLabel(from)} до {formatHospitalLabel(to)}
                     </p>
                     <p className={styles.hospitalDashboardTransferText}>
-                      {shipment.fromHospitalId === hospital.id ? "Outgoing" : "Incoming"} · ETA {Math.round(shipment.etaMinutes)}m
+                      {shipment.fromHospitalId === hospital.id ? "Изходяща" : "Входяща"} · Очаквано пристигане {Math.round(shipment.etaMinutes)} мин.
                     </p>
+                    <p className="text-xs text-muted-foreground">{shipment.id} · {new Date(shipment.updatedAt).toLocaleString("bg-BG", { timeZone: "Europe/Sofia" })}</p>
+                    {shipment.progress >= 1 && shipment.status !== "delivered" && shipment.status !== "cancelled" && <p className="text-sm text-muted-foreground">Пристигнала · очаква потвърждение за получаване</p>}
                     <div className={styles.hospitalDashboardTransferActions}>
                       {(shipment.status === "planned" || shipment.status === "approved") &&
                         shipment.fromHospitalId === currentHospitalId && (
@@ -246,10 +293,10 @@ export function HospitalDashboardView({
                             className={styles.hospitalDashboardButton}
                             onClick={() => onDispatchShipment(shipment.id)}
                           >
-                            Dispatch Shipment
+                            Изпращане на пратката
                           </Button>
                         )}
-                      {shipment.toHospitalId === currentHospitalId && shipment.status !== "delivered" && (
+                      {shipment.toHospitalId === currentHospitalId && (shipment.status === "in_transit" || shipment.status === "delayed") && (
                         <Button
                           type="button"
                           variant="secondary"
@@ -257,15 +304,15 @@ export function HospitalDashboardView({
                           className={styles.hospitalDashboardButton}
                           onClick={() => onReceiveShipment(shipment.id)}
                         >
-                          Mark Received
+                          Потвърждаване на получаване
                         </Button>
                       )}
                     </div>
                   </div>
                 );
               })}
-              {activeShipments.length === 0 ? (
-                <p className={styles.hospitalDashboardTransferText}>No active shipments.</p>
+              {displayedShipments.length === 0 ? (
+                <p className={styles.hospitalDashboardTransferText}>{shipmentTab === "active" ? "Няма активни пратки." : "Все още няма история на пратки."}</p>
               ) : null}
             </div>
           </CardContent>
@@ -275,14 +322,14 @@ export function HospitalDashboardView({
       <section className={styles.hospitalDashboardSection}>
         <Card className={cn(surfaceStyles.dashboardCardSurface, styles.hospitalDashboardDispatchCard)}>
           <CardHeader className={styles.hospitalDashboardCardHeader}>
-            <CardTitle className={styles.hospitalDashboardCardTitle}>Real-Time Dispatches</CardTitle>
+            <CardTitle className={styles.hospitalDashboardCardTitle}>Пратки в реално време</CardTitle>
           </CardHeader>
           <div className={styles.hospitalDashboardMapWrap}>
             <div className={styles.hospitalDashboardMapFrame}>
               <ShipmentMapCanvas
                 hospitals={hospitals}
                 shipments={dispatchShipments}
-                forecasts={hospitalForecasts}
+                forecasts={forecasts.filter((item) => scopedFacilities.some((facility) => facility.id === item.hospitalId))}
                 highlightedHospitalId={hospital.id}
                 mapboxToken={PUBLIC_MAPBOX_TOKEN}
               />

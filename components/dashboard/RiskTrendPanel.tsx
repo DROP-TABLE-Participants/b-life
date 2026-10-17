@@ -19,7 +19,7 @@ export function RiskTrendPanel({ forecasts, hospitals }: RiskTrendPanelProps) {
 
   return (
     <GlassCard>
-      <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Forecast Risk Intensity</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Прогнозен риск от недостиг</h3>
       <div className="mt-4 space-y-3">
         {top.map((forecast) => (
           <div key={`${forecast.hospitalId}-${forecast.bloodType}`}>

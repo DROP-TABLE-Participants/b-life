@@ -1,5 +1,6 @@
 import { distanceKmBetween } from "@/lib/utils";
-import type { Forecast, Hospital, TransferRecommendation } from "@/types/domain";
+import { describeTransfer } from "@/lib/labels";
+import type { Forecast, Hospital, Shipment, TransferRecommendation } from "@/types/domain";
 
 const SERVICE_LEVEL_Z = 1.28;
 const MIN_TRANSFER_UNITS = 4;
@@ -29,7 +30,7 @@ const urgencyFromScore = (score: number): TransferRecommendation["urgency"] => {
   return "low";
 };
 
-export const runRedistributionEngine = (hospitals: Hospital[], forecasts: Forecast[]): TransferRecommendation[] => {
+export const runRedistributionEngine = (hospitals: Hospital[], forecasts: Forecast[], shipments: Shipment[] = []): TransferRecommendation[] => {
   const hospitalById = Object.fromEntries(hospitals.map((hospital) => [hospital.id, hospital]));
   const scenarioByKey = Object.fromEntries(
     forecasts.map((forecast) => {
@@ -37,14 +38,18 @@ export const runRedistributionEngine = (hospitals: Hospital[], forecasts: Foreca
       const sigmaDaily = Math.max(1.2, forecast.predictedDemand24h * 0.18);
       const sigma3 = Math.sqrt(3) * sigmaDaily;
       const requiredStock3d = mu3 + SERVICE_LEVEL_Z * sigma3;
-      const available3d = forecast.currentUnits;
+      const reserved = shipments.filter((item) => item.fromHospitalId === forecast.hospitalId && item.bloodType === forecast.bloodType &&
+        (item.status === "planned" || item.status === "approved")).reduce((sum, item) => sum + item.quantity, 0);
+      const incoming = shipments.filter((item) => item.toHospitalId === forecast.hospitalId && item.bloodType === forecast.bloodType &&
+        item.status !== "delivered" && item.status !== "cancelled").reduce((sum, item) => sum + item.quantity, 0);
+      const available3d = forecast.currentUnits - reserved;
       const shortageRiskProbability =
         sigma3 <= 1e-9
           ? available3d < mu3
             ? 1
             : 0
           : 1 - normalCdf((available3d - mu3) / sigma3);
-      const transferNeed = Math.max(0, Math.ceil(requiredStock3d - available3d));
+      const transferNeed = Math.max(0, Math.ceil(requiredStock3d - available3d - incoming));
       const donorReserveFloor = Math.ceil(mu3 + 0.25 * sigma3);
       const donorShareable = Math.max(0, Math.floor(available3d - donorReserveFloor));
 
@@ -127,7 +132,7 @@ export const runRedistributionEngine = (hospitals: Hospital[], forecasts: Foreca
       toHospitalId: selected.to.id,
       bloodType: selected.candidateForecast.bloodType,
       suggestedQuantity,
-      reason: `${selected.to.name} needs safety-stock support over the next 72h while ${selected.from.name} can share with buffer preserved.`,
+      reason: describeTransfer(selected.from.name, selected.to.name),
       urgency: urgencyFromScore(Math.round(needScenario.shortageRiskProbability * 100)),
       distanceKm: Number(selected.distanceKm.toFixed(1)),
       etaMinutes,

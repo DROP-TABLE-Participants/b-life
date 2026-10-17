@@ -45,15 +45,16 @@ export const lerpCoordinates = (
 ]
 
 export const formatMinutes = (minutes: number): string => {
-  if (minutes < 60) return `${Math.max(0, Math.round(minutes))}m`
-  const hours = Math.floor(minutes / 60)
-  const mins = Math.round(minutes % 60)
-  return `${hours}h ${mins}m`
+  const totalMinutes = Math.max(0, Math.round(minutes))
+  if (totalMinutes < 60) return `${totalMinutes} мин.`
+  const hours = Math.floor(totalMinutes / 60)
+  const mins = totalMinutes % 60
+  return `${hours} ч. ${mins} мин.`
 }
 
 export const formatHospitalLabel = (
   hospital?: { name: string; city: string } | null
 ): string => {
-  if (!hospital) return "Unknown Hospital"
+  if (!hospital) return "Непознато лечебно заведение"
   return `${hospital.name} (${hospital.city})`
 }
