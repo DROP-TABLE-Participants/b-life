@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import MapView, { Layer, Marker, Source, type LayerProps, type MapRef, type MapMouseEvent } from "react-map-gl/mapbox";
+import MapView, { Layer, Marker, Source, type LayerProps, type LineLayerSpecification, type MapRef, type MapMouseEvent } from "react-map-gl/mapbox";
 import type { FeatureCollection, LineString } from "geojson";
 import { Building2, ChartNoAxesCombined, Hospital as HospitalIcon, Minus, Plus, Scan, Send, Sparkles, Truck } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -36,19 +36,21 @@ const PENDING = "#94a3b8";
 const FACILITY_COLORS: Record<Hospital["kind"], string> = { national_center: "#e85a39", regional_center: "#2563eb", hospital: "#059669" };
 const moving = (shipment: Shipment) => shipment.status === "in_transit" || shipment.status === "delayed";
 
-const routeGlowLayer: LayerProps = {
+// Opacity is a number or a Mapbox expression that dims everything except the hovered route.
+type LineOpacity = NonNullable<NonNullable<LineLayerSpecification["paint"]>["line-opacity"]>;
+const routeGlowLayer = (opacity: LineOpacity): LayerProps => ({
   id: "active-shipment-routes-glow", type: "line", filter: ["==", ["get", "moving"], true], layout: { "line-cap": "round", "line-join": "round" },
-  paint: { "line-width": 10, "line-opacity": 0.16, "line-color": ["get", "color"] },
-};
-const routeLayer: LayerProps = {
+  paint: { "line-width": 10, "line-opacity": opacity, "line-color": ["get", "color"] },
+});
+const routeLayer = (opacity: LineOpacity): LayerProps => ({
   id: "active-shipment-routes", type: "line", filter: ["==", ["get", "moving"], true], layout: { "line-cap": "round", "line-join": "round" },
-  paint: { "line-width": 3.5, "line-opacity": 0.95, "line-color": ["get", "color"] },
-};
+  paint: { "line-width": 3.5, "line-opacity": opacity, "line-color": ["get", "color"] },
+});
 // Approved and planned shipments have not left yet: a quiet dashed line.
-const pendingRouteLayer: LayerProps = {
+const pendingRouteLayer = (opacity: LineOpacity): LayerProps => ({
   id: "pending-shipment-routes", type: "line", filter: ["==", ["get", "moving"], false], layout: { "line-cap": "round", "line-join": "round" },
-  paint: { "line-width": 2, "line-opacity": 0.9, "line-color": PENDING, "line-dasharray": [2, 2] },
-};
+  paint: { "line-width": 2, "line-opacity": opacity, "line-color": PENDING, "line-dasharray": [2, 2] },
+});
 const routeHitLayer: LayerProps = { id: "active-shipment-routes-hit", type: "line", paint: { "line-width": 20, "line-opacity": 0 } };
 const pairKey = (shipment: Shipment) => `${shipment.fromHospitalId}->${shipment.toHospitalId}`;
 const shortLabel = (facility: Hospital) => facility.kind === "national_center" ? `НЦТХ · ${facility.city}` : facility.kind === "regional_center" ? `РЦТХ · ${facility.city}` : `Света София · ${facility.city}`;
@@ -78,6 +80,7 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
   const [routeCoordinates, setRouteCoordinates] = useState<Record<string, [number, number][]>>({});
   const [mapError, setMapError] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [hover, setHover] = useState<{ ids: string[]; x: number; y: number; width: number; height: number } | null>(null);
   const hospitalById = new Map(hospitals.map((facility) => [facility.id, facility]));
   const activeShipments = shipments.filter((item) => item.status !== "delivered" && item.status !== "cancelled" &&
     (!highlightedHospitalId || item.fromHospitalId === highlightedHospitalId || item.toHospitalId === highlightedHospitalId));
@@ -136,6 +139,24 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
     if (shipmentId) chooseShipment(String(shipmentId));
   };
   const name = (id: string) => facilityShortName(hospitalById.get(id));
+  const onMapHover = (event: MapMouseEvent) => {
+    const ids = [...new Set((event.features ?? []).map((feature) => String(feature.properties?.shipmentId ?? "")).filter(Boolean))];
+    const container = event.target.getContainer();
+    setHover(ids.length ? { ids, x: event.point.x, y: event.point.y, width: container.clientWidth, height: container.clientHeight } : null);
+  };
+  // The hovered route stays fully drawn and thicker; the others step back.
+  const hoveredId = hover?.ids[0] ?? "";
+  const emphasis = (opacity: number): LineOpacity => hover
+    ? ["case", ["in", ["get", "shipmentId"], ["literal", hover.ids]], opacity, opacity * 0.3]
+    : opacity;
+  const hoveredRouteLayer: LayerProps = {
+    id: "hovered-shipment-route", type: "line", filter: ["==", ["get", "shipmentId"], hoveredId], layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-width": 6, "line-opacity": 1, "line-color": ["case", ["get", "moving"], ["get", "color"], "#64748b"] },
+  };
+  const hoveredCasingLayer: LayerProps = {
+    id: "hovered-shipment-route-casing", type: "line", filter: ["==", ["get", "shipmentId"], hoveredId], layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-width": 11, "line-opacity": 0.9, "line-color": "#ffffff" },
+  };
 
   return <div className="absolute inset-0">
     {!mapReady && !mapError && <AppLoadingScreen overlay />}
@@ -144,14 +165,18 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
         locale={MAP_LOCALE} language="bg" initialViewState={{ longitude: 25.4, latitude: 42.7, zoom: 6.4 }}
         maxBounds={BULGARIA_MAX_BOUNDS} minZoom={5.5} maxZoom={16} renderWorldCopies={false} attributionControl={false}
         style={{ width: "100%", height: "100%" }} interactiveLayerIds={["active-shipment-routes", "active-shipment-routes-hit"]}
-        onClick={onMapClick} onLoad={() => { setMapError(false); mapRef.current?.fitBounds(BULGARIA_BOUNDS, { padding: { top: 60, bottom: 60, left: 400, right: 60 }, maxZoom: 7.2, duration: 0 }); }}
+        onClick={onMapClick} onMouseMove={onMapHover} onMouseLeave={() => setHover(null)} cursor={hover ? "pointer" : undefined} onLoad={() => { setMapError(false); mapRef.current?.fitBounds(BULGARIA_BOUNDS, { padding: { top: 60, bottom: 60, left: 400, right: 60 }, maxZoom: 7.2, duration: 0 }); }}
         onIdle={() => setMapReady(true)}
         onError={() => setMapError(true)}>
         <Source id="bulgaria-territory" type="geojson" data={BULGARIA_BOUNDARY}>
           <Layer id="bulgaria-tint" type="fill" paint={{ "fill-color": "#ffffff", "fill-opacity": 0.35 }} />
         </Source>
         <Source id="active-routes" type="geojson" data={routes}>
-          <Layer {...routeHitLayer} /><Layer {...pendingRouteLayer} /><Layer {...routeGlowLayer} /><Layer {...routeLayer} />
+          <Layer {...routeHitLayer} />
+          <Layer {...pendingRouteLayer(emphasis(0.9))} />
+          <Layer {...routeGlowLayer(emphasis(0.16))} />
+          <Layer {...routeLayer(emphasis(0.95))} />
+          <Layer {...hoveredCasingLayer} /><Layer {...hoveredRouteLayer} />
         </Source>
         <Source id="outside-bulgaria" type="geojson" data={OUTSIDE_BULGARIA_MASK}>
           <Layer id="outside-bulgaria-mask" type="fill" paint={{ "fill-color": "#f8fafc", "fill-opacity": 1 }} />
@@ -165,8 +190,10 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
           const [longitude, latitude] = positionOnRoute(route, shipment.progress);
           const color = shipment.status === "delayed" ? DELAYED : BRAND;
           return <Marker key={shipment.id} longitude={longitude} latitude={latitude}>
-            <button type="button" aria-label={`Проследяване: ${shipment.bloodType}, ${shipment.quantity} единици`} title={`${shipment.bloodType} · ${shipment.quantity} ед. · ~${formatMinutes(shipment.etaMinutes)}`}
-              className="flex size-8 items-center justify-center rounded-full border-2 bg-white shadow-popover" style={{ borderColor: color, color }}
+            <button type="button" aria-label={`Проследяване: ${shipment.bloodType}, ${shipment.quantity} единици`}
+              className={cn("flex size-8 items-center justify-center rounded-full border-2 bg-white shadow-popover transition-transform", hover?.ids.includes(shipment.id) && "scale-115")} style={{ borderColor: color, color }}
+              onMouseEnter={() => { const point = mapRef.current?.project([longitude, latitude]); const container = mapRef.current?.getContainer(); if (point && container) setHover({ ids: [shipment.id], x: point.x, y: point.y, width: container.clientWidth, height: container.clientHeight }); }}
+              onMouseLeave={() => setHover(null)}
               onClick={(event) => { event.stopPropagation(); chooseShipment(shipment.id); }}><Truck size={15} /></button>
           </Marker>;
         })}
@@ -223,6 +250,8 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
           <i className="size-2.5 rounded-full border-[1.5px] border-white" style={{ backgroundColor: FACILITY_COLORS[kind] }} />{FACILITY_ROLE_LABELS[kind]}</span>)}
       </div>
     </div>
+    {hover && <RouteTooltip x={hover.x} y={hover.y} width={hover.width} height={hover.height}
+      shipments={hover.ids.map((id) => activeShipments.find((item) => item.id === id)).filter((item): item is Shipment => !!item).sort((a, b) => Number(moving(b)) - Number(moving(a)))} name={name} />}
     {mapError && <p role="status" className={cn(glass, "absolute bottom-6 left-6 px-4 py-2 text-xs text-elevated")}>Фоновата карта не се зареди изцяло. Обектите и пратките остават достъпни.</p>}
 
     <Sheet open={!!selectedHospital} onOpenChange={(open) => { if (!open) closeHospital(); }}>
@@ -311,4 +340,31 @@ function FacilitySheet({ facility, hospitals, forecasts, shipments, activeShipme
       {canAct && <Button className="flex-1" nativeButton={false} render={<Link href={`${workspaceBase}/transfers?send=1&to=${facility.id}`} />}><Send />Изпращане към обекта</Button>}
     </SheetFooter>
   </SheetContent>;
+}
+
+function RouteTooltip({ x, y, width, height, shipments, name }: { x: number; y: number; width: number; height: number; shipments: Shipment[]; name: (id: string) => string }) {
+  if (shipments.length === 0) return null;
+  const tooltipWidth = 280;
+  const flip = x + 16 + tooltipWidth > width - 16;
+  // In the lower half the tooltip opens upwards so it never runs under the legend.
+  const above = y > height * 0.5;
+  return <div role="tooltip" className={cn(glass, "pointer-events-none absolute z-20 w-[280px] divide-y divide-hairline px-3.5 py-1")}
+    style={{ left: flip ? x - 16 - tooltipWidth : x + 16, ...(above ? { bottom: Math.max(12, height - y - 12) } : { top: Math.max(12, y - 12) }) }}>
+    {shipments.slice(0, 3).map((item) => {
+      const percent = Math.round(Math.min(1, item.progress) * 100);
+      const state = !moving(item) ? "Очаква изпращане" : item.progress >= 1 ? "Пристигна · очаква потвърждение" : `Пристига след ~${formatMinutes(item.etaMinutes)}`;
+      return <div key={item.id} className="space-y-1.5 py-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-ink">{item.bloodType} · {item.quantity} ед.</span>
+          <StatusBadge status={item.status} />
+        </div>
+        <p className="text-xs text-ink-secondary">{name(item.fromHospitalId)} → {name(item.toHospitalId)}</p>
+        <p className={cn("text-xs", item.status === "delayed" ? "text-elevated" : "text-ink")}>{state} · приоритет {PRIORITY_LABELS[item.priority].toLowerCase()}</p>
+        {moving(item) && <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-hairline">
+          <div className={cn("h-full rounded-full", item.status === "delayed" ? "bg-elevated" : "bg-brand")} style={{ width: `${percent}%` }} />
+        </div>}
+      </div>;
+    })}
+    {shipments.length > 3 && <p className="py-2 text-xs text-ink-muted">Още {shipments.length - 3} по този маршрут</p>}
+  </div>;
 }
