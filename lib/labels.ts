@@ -1,4 +1,4 @@
-import type { PriorityLevel, RecommendationStatus, RiskLevel, ShipmentStatus } from "@/types/domain";
+import type { BloodOrderStatus, PriorityLevel, RecommendationStatus, RiskLevel, ShipmentStatus } from "@/types/domain";
 
 export const NATIONAL_CENTER_NAME = "Национален център по трансфузионна хематология";
 export const MINISTRY_NAME = "Министерство на здравеопазването";
@@ -19,6 +19,10 @@ export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
 export const RECOMMENDATION_STATUS_LABELS: Record<RecommendationStatus, string> = {
   pending_approval: "Очаква одобрение", approved: "Одобрена", dispatched: "Изпратена",
   fulfilled: "Изпълнена", cancelled: "Отменена",
+};
+
+export const ORDER_STATUS_LABELS: Record<BloodOrderStatus, string> = {
+  pending: "Очаква приемане", accepted: "Приета", rejected: "Отказана", cancelled: "Отменена", fulfilled: "Изпълнена",
 };
 
 export const MAP_LOCALE = {

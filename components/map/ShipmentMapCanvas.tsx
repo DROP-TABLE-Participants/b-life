@@ -1,984 +1,188 @@
 "use client";
 
-import { PRIORITY_LABELS, SHIPMENT_STATUS_LABELS, MAP_LOCALE } from "@/lib/labels";
-
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Feature, FeatureCollection, LineString, Point } from "geojson";
-import MapView, {
-  Layer,
-  NavigationControl,
-  Source,
-  type LayerProps,
-  type MapMouseEvent,
-  type MapRef,
-} from "react-map-gl/mapbox";
-import type { MapboxGeoJSONFeature } from "mapbox-gl";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn, formatHospitalLabel, formatMinutes } from "@/lib/utils";
-import type { Forecast, Hospital, Shipment } from "@/types/domain";
-import surfaceStyles from "../dashboard/DashboardCardSurface.module.css";
-import sheetStyles from "../dashboard/BloodTypeInsightSheet.module.css";
+import { useEffect, useRef, useState } from "react";
+import MapView, { Layer, Marker, NavigationControl, Source, type LayerProps, type MapRef, type MapMouseEvent } from "react-map-gl/mapbox";
+import type { FeatureCollection, LineString } from "geojson";
+import { Building2, Hospital as HospitalIcon, Truck } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { AppLoadingScreen } from "@/components/ui/AppLoadingScreen";
+import { FACILITY_ROLE_LABELS } from "@/lib/access";
+import { BULGARIA_BOUNDARY, BULGARIA_BOUNDS, BULGARIA_MAX_BOUNDS, OUTSIDE_BULGARIA_MASK } from "@/lib/geo/bulgaria";
+import { MAP_LOCALE, PRIORITY_LABELS, SHIPMENT_STATUS_LABELS } from "@/lib/labels";
+import { formatHospitalLabel, formatMinutes } from "@/lib/utils";
+import { BLOOD_TYPES, type Hospital, type Shipment } from "@/types/domain";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 interface ShipmentMapCanvasProps {
   hospitals: Hospital[];
   shipments: Shipment[];
-  forecasts: Forecast[];
   highlightedHospitalId?: string;
   mapboxToken: string;
-  mode?: "base" | "riskHeatmap";
 }
 
-const DEFAULT_VIEW_STATE = {
-  longitude: 23.3219,
-  latitude: 42.6977,
-  zoom: 10.5,
+const routeColors = { planned: "#64748b", approved: "#0284c7", in_transit: "#06b6d4", delayed: "#d97706", delivered: "#10b981", cancelled: "#94a3b8" };
+const routeLayer: LayerProps = {
+  id: "active-shipment-routes", type: "line", layout: { "line-cap": "round", "line-join": "round" },
+  paint: { "line-width": 4, "line-opacity": 0.8, "line-color": ["get", "color"] },
 };
+const routeHitLayer: LayerProps = { id: "active-shipment-routes-hit", type: "line", paint: { "line-width": 20, "line-opacity": 0 } };
+const pairKey = (shipment: Shipment) => `${shipment.fromHospitalId}->${shipment.toHospitalId}`;
+const shortLabel = (facility: Hospital) => facility.kind === "national_center" ? `НЦТХ · ${facility.city}` : facility.kind === "regional_center" ? `РЦТХ · ${facility.city}` : `Света София · ${facility.city}`;
 
-const BULGARIA_BOUNDS: [[number, number], [number, number]] = [
-  [22.360344, 41.339032],
-  [28.57904, 44.215343],
-];
-
-const HOSPITAL_VIEW_ZOOM = 9.8;
-
-const heatmapLayer: LayerProps = {
-  id: "hospital-risk-heatmap",
-  type: "heatmap",
-  source: "hospital-risk",
-  maxzoom: 15,
-  paint: {
-    "heatmap-weight": [
-      "interpolate",
-      ["linear"],
-      ["get", "riskScore"],
-      0,
-      0,
-      100,
-      1,
-    ],
-    "heatmap-intensity": [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      5,
-      1.4,
-      10,
-      2.8,
-    ],
-    "heatmap-radius": [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      5,
-      34,
-      10,
-      58,
-      14,
-      76,
-    ],
-    "heatmap-opacity": 1,
-    "heatmap-color": [
-      "interpolate",
-      ["linear"],
-      ["heatmap-density"],
-      0,
-      "rgba(34,197,94,0.15)",
-      0.15,
-      "rgba(163,230,53,0.45)",
-      0.35,
-      "rgba(250,204,21,0.72)",
-      0.6,
-      "rgba(249,115,22,0.88)",
-      1,
-      "rgba(239,68,68,0.98)",
-    ],
-  },
-};
-
-const riskPointLayer: LayerProps = {
-  id: "hospital-risk-points",
-  type: "circle",
-  source: "hospital-risk",
-  minzoom: 7,
-  paint: {
-    "circle-radius": [
-      "interpolate",
-      ["linear"],
-      ["get", "riskScore"],
-      0,
-      7,
-      100,
-      18,
-    ],
-    "circle-color": [
-      "interpolate",
-      ["linear"],
-      ["get", "riskScore"],
-      0,
-      "#22c55e",
-      35,
-      "#facc15",
-      60,
-      "#fb923c",
-      80,
-      "#ef4444",
-    ],
-    "circle-stroke-color": "#ffffff",
-    "circle-stroke-width": 1.5,
-    "circle-opacity": 0.95,
-  },
-};
-
-const riskHitLayer: LayerProps = {
-  id: "hospital-risk-hit",
-  type: "circle",
-  source: "hospital-risk",
-  minzoom: 6,
-  paint: {
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 20, 10, 28, 14, 36],
-    "circle-color": "#ffffff",
-    "circle-opacity": 0.01,
-  },
-};
-
-const createSelectedRiskPointLayer = (hospitalId: string): LayerProps => ({
-  id: "hospital-risk-selected",
-  type: "circle",
-  source: "hospital-risk",
-  filter: ["==", ["get", "hospitalId"], hospitalId],
-  paint: {
-    "circle-radius": 24,
-    "circle-color": "rgba(255,255,255,0.05)",
-    "circle-stroke-color": "#ffffff",
-    "circle-stroke-width": 2,
-    "circle-opacity": 0.95,
-  },
-});
-
-const hospitalNodeLayer: LayerProps = {
-  id: "hospital-nodes",
-  type: "circle",
-  source: "hospital-nodes",
-  paint: {
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 5, 10, 8, 14, 11],
-    "circle-color": "#e2e8f0",
-    "circle-stroke-color": "#0f172a",
-    "circle-stroke-width": 1.4,
-    "circle-opacity": 0.95,
-  },
-};
-
-const createHighlightedHospitalNodeLayer = (hospitalId: string): LayerProps => ({
-  id: "hospital-nodes-selected",
-  type: "circle",
-  source: "hospital-nodes",
-  filter: ["==", ["get", "hospitalId"], hospitalId],
-  paint: {
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 9, 10, 14, 14, 18],
-    "circle-color": "rgba(56,189,248,0.14)",
-    "circle-stroke-color": "#38bdf8",
-    "circle-stroke-width": 2,
-    "circle-opacity": 1,
-  },
-});
-
-const shipmentRouteLayer: LayerProps = {
-  id: "shipment-routes",
-  type: "line",
-  source: "shipment-routes",
-  layout: {
-    "line-cap": "round",
-    "line-join": "round",
-  },
-  paint: {
-    "line-width": ["interpolate", ["linear"], ["zoom"], 5, 2, 10, 4, 14, 6],
-    "line-color": [
-      "match",
-      ["get", "status"],
-      "planned",
-      "#64748b",
-      "approved",
-      "#0284c7",
-      "in_transit",
-      "#06b6d4",
-      "delayed",
-      "#f59e0b",
-      "delivered",
-      "#10b981",
-      "#94a3b8",
-    ],
-    "line-opacity": [
-      "case",
-      ["==", ["get", "status"], "delivered"],
-      0.32,
-      ["==", ["get", "status"], "cancelled"],
-      0.22,
-      0.9,
-    ],
-  },
-};
-
-const shipmentRouteHitLayer: LayerProps = {
-  id: "shipment-routes-hit",
-  type: "line",
-  source: "shipment-routes",
-  layout: {
-    "line-cap": "round",
-    "line-join": "round",
-  },
-  paint: {
-    "line-width": ["interpolate", ["linear"], ["zoom"], 5, 10, 10, 16, 14, 22],
-    "line-color": "#ffffff",
-    "line-opacity": 0.01,
-  },
-};
-
-const createSelectedShipmentRouteLayer = (shipmentId: string): LayerProps => ({
-  id: "shipment-routes-selected",
-  type: "line",
-  source: "shipment-routes",
-  filter: ["==", ["get", "shipmentId"], shipmentId],
-  layout: {
-    "line-cap": "round",
-    "line-join": "round",
-  },
-  paint: {
-    "line-width": ["interpolate", ["linear"], ["zoom"], 5, 4, 10, 7, 14, 10],
-    "line-color": "#f8fafc",
-    "line-opacity": 0.8,
-  },
-});
-
-const shipmentTruckLayer: LayerProps = {
-  id: "shipment-trucks",
-  type: "circle",
-  source: "shipment-trucks",
-  paint: {
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 5, 10, 8, 14, 12],
-    "circle-color": [
-      "match",
-      ["get", "status"],
-      "planned",
-      "#64748b",
-      "approved",
-      "#0284c7",
-      "in_transit",
-      "#22d3ee",
-      "delayed",
-      "#f59e0b",
-      "delivered",
-      "#10b981",
-      "#94a3b8",
-    ],
-    "circle-stroke-color": "#e2e8f0",
-    "circle-stroke-width": 1.6,
-    "circle-opacity": 0.95,
-  },
-};
-
-type InteractiveMapMouseEvent = MapMouseEvent & {
-  features?: MapboxGeoJSONFeature[];
-};
-
-const createRoutePairKey = (fromHospitalId: string, toHospitalId: string): string =>
-  `${fromHospitalId}->${toHospitalId}`;
-
-const coordinateDistance = (from: [number, number], to: [number, number]): number => {
-  const deltaLng = to[0] - from[0];
-  const deltaLat = to[1] - from[1];
-  return Math.hypot(deltaLng, deltaLat);
-};
-
-const interpolateOnRoute = (routeCoordinates: [number, number][], progress: number): [number, number] => {
-  if (routeCoordinates.length === 0) return [DEFAULT_VIEW_STATE.longitude, DEFAULT_VIEW_STATE.latitude];
-  if (routeCoordinates.length === 1) return routeCoordinates[0];
-
-  const clampedProgress = Math.max(0, Math.min(1, progress));
-  if (clampedProgress === 0) return routeCoordinates[0];
-  if (clampedProgress === 1) return routeCoordinates[routeCoordinates.length - 1];
-
-  const segmentLengths = routeCoordinates
-    .slice(0, -1)
-    .map((point, index) => coordinateDistance(point, routeCoordinates[index + 1]));
-  const totalLength = segmentLengths.reduce((sum, length) => sum + length, 0);
-
-  if (totalLength <= 0) {
-    return routeCoordinates[0];
-  }
-
-  const targetLength = totalLength * clampedProgress;
-  let traversedLength = 0;
-
-  for (let index = 0; index < segmentLengths.length; index += 1) {
-    const segmentLength = segmentLengths[index];
-    const nextTraversedLength = traversedLength + segmentLength;
-
-    if (targetLength <= nextTraversedLength || index === segmentLengths.length - 1) {
-      const localProgress = segmentLength === 0 ? 0 : (targetLength - traversedLength) / segmentLength;
-      const from = routeCoordinates[index];
-      const to = routeCoordinates[index + 1];
-
-      return [
-        from[0] + (to[0] - from[0]) * localProgress,
-        from[1] + (to[1] - from[1]) * localProgress,
-      ];
+const positionOnRoute = (points: [number, number][], progress: number): [number, number] => {
+  const lengths = points.slice(1).map((point, index) => Math.hypot(point[0] - points[index][0], point[1] - points[index][1]));
+  let remaining = lengths.reduce((sum, value) => sum + value, 0) * Math.min(1, Math.max(0, progress));
+  for (let index = 0; index < lengths.length; index++) {
+    if (remaining <= lengths[index]) {
+      const fraction = lengths[index] === 0 ? 0 : remaining / lengths[index];
+      return [points[index][0] + (points[index + 1][0] - points[index][0]) * fraction, points[index][1] + (points[index + 1][1] - points[index][1]) * fraction];
     }
-
-    traversedLength = nextTraversedLength;
+    remaining -= lengths[index];
   }
-
-  return routeCoordinates[routeCoordinates.length - 1];
+  return points[points.length - 1];
 };
 
-export function ShipmentMapCanvas({
-  hospitals,
-  shipments,
-  forecasts,
-  highlightedHospitalId,
-  mapboxToken,
-  mode = "base",
-}: ShipmentMapCanvasProps) {
+export function ShipmentMapCanvas({ hospitals, shipments, highlightedHospitalId, mapboxToken }: ShipmentMapCanvasProps) {
   const mapRef = useRef<MapRef | null>(null);
-  const lastContextKeyRef = useRef<string | null>(null);
-
-  const highlightedHospitalCoordinates = useMemo<[number, number] | null>(() => {
-    if (!highlightedHospitalId) return null;
-    const hospital = hospitals.find((item) => item.id === highlightedHospitalId);
-    return hospital?.coordinates ?? null;
-  }, [highlightedHospitalId, hospitals]);
-
-  const highlightedHospitalLongitude = highlightedHospitalCoordinates?.[0] ?? null;
-  const highlightedHospitalLatitude = highlightedHospitalCoordinates?.[1] ?? null;
-
-  const initialViewState = useMemo(() => {
-    if (mode === "riskHeatmap") {
-      return {
-        longitude: (BULGARIA_BOUNDS[0][0] + BULGARIA_BOUNDS[1][0]) / 2,
-        latitude: (BULGARIA_BOUNDS[0][1] + BULGARIA_BOUNDS[1][1]) / 2,
-        zoom: 6.5,
-      };
-    }
-
-    if (highlightedHospitalCoordinates) {
-      return {
-        longitude: highlightedHospitalCoordinates[0],
-        latitude: highlightedHospitalCoordinates[1],
-        zoom: HOSPITAL_VIEW_ZOOM,
-      };
-    }
-
-    return DEFAULT_VIEW_STATE;
-  }, [highlightedHospitalCoordinates, mode]);
-
-  const [center, setCenter] = useState<[number, number]>([
-    initialViewState.longitude,
-    initialViewState.latitude,
-  ]);
-  const [zoom, setZoom] = useState(initialViewState.zoom);
-  const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(highlightedHospitalId ?? null);
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(null);
   const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
-  const [routeCoordinatesByPair, setRouteCoordinatesByPair] = useState<Record<string, [number, number][]>>({});
-
-  const hospitalsById = useMemo(() => {
-    return new Map(hospitals.map((hospital) => [hospital.id, hospital]));
-  }, [hospitals]);
-
-  const scopedShipments = useMemo(() => {
-    if (!highlightedHospitalId) return shipments;
-    return shipments.filter(
-      (shipment) => shipment.fromHospitalId === highlightedHospitalId || shipment.toHospitalId === highlightedHospitalId,
-    );
-  }, [highlightedHospitalId, shipments]);
-
-  const activeScopedShipments = useMemo(() => {
-    return scopedShipments.filter((shipment) => shipment.status !== "delivered" && shipment.status !== "cancelled");
-  }, [scopedShipments]);
-
-  const scopedRoutePairs = useMemo(() => {
-    const seen = new Set<string>();
-    const pairs: Array<{ routePairKey: string; from: [number, number]; to: [number, number] }> = [];
-
-    for (const shipment of scopedShipments) {
-      const from = hospitalsById.get(shipment.fromHospitalId);
-      const to = hospitalsById.get(shipment.toHospitalId);
-      if (!from || !to) continue;
-
-      const routePairKey = createRoutePairKey(shipment.fromHospitalId, shipment.toHospitalId);
-      if (seen.has(routePairKey)) continue;
-
-      seen.add(routePairKey);
-      pairs.push({
-        routePairKey,
-        from: from.coordinates,
-        to: to.coordinates,
-      });
-    }
-
-    return pairs;
-  }, [hospitalsById, scopedShipments]);
+  const [routeCoordinates, setRouteCoordinates] = useState<Record<string, [number, number][]>>({});
+  const [mapError, setMapError] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const hospitalById = new Map(hospitals.map((facility) => [facility.id, facility]));
+  const activeShipments = shipments.filter((item) => item.status !== "delivered" && item.status !== "cancelled" &&
+    (!highlightedHospitalId || item.fromHospitalId === highlightedHospitalId || item.toHospitalId === highlightedHospitalId));
+  const pairs = new Map(activeShipments.map((item) => [pairKey(item), {
+    key: pairKey(item), from: hospitalById.get(item.fromHospitalId)?.coordinates, to: hospitalById.get(item.toHospitalId)?.coordinates,
+  }]));
+  const routePairsKey = JSON.stringify([...pairs.values()]);
 
   useEffect(() => {
-    if (mode !== "base" || !mapboxToken) return;
-
-    const missingPairs = scopedRoutePairs.filter((pair) => !routeCoordinatesByPair[pair.routePairKey]);
-    if (missingPairs.length === 0) return;
-
-    let isCancelled = false;
-
-    const fetchRoutes = async () => {
-      const fetchedRoutes: Record<string, [number, number][]> = {};
-
-      await Promise.all(
-        missingPairs.map(async (pair) => {
-          const [fromLng, fromLat] = pair.from;
-          const [toLng, toLat] = pair.to;
-          const url =
-            `https://api.mapbox.com/directions/v5/mapbox/driving/` +
-            `${fromLng},${fromLat};${toLng},${toLat}` +
-            `?geometries=geojson&overview=full&access_token=${mapboxToken}`;
-
-          try {
-            const response = await fetch(url);
-            if (!response.ok) return;
-
-            const payload = (await response.json()) as {
-              routes?: Array<{ geometry?: { coordinates?: number[][] } }>;
-            };
-
-            const routeCoordinates = payload.routes?.[0]?.geometry?.coordinates;
-            if (!routeCoordinates || routeCoordinates.length < 2) return;
-
-            fetchedRoutes[pair.routePairKey] = routeCoordinates
-              .filter((coordinate): coordinate is number[] => Array.isArray(coordinate) && coordinate.length >= 2)
-              .map((coordinate) => [coordinate[0], coordinate[1]] as [number, number]);
-          } catch {
-            // Keep straight-line fallback when route lookup fails.
+    const controller = new AbortController();
+    const routePairs = JSON.parse(routePairsKey) as Array<{ key: string; from?: [number, number]; to?: [number, number] }>;
+    void Promise.all(routePairs.map(async ({ key, from, to }) => {
+      if (!from || !to) return null;
+      let coordinates: [number, number][] = [from, to];
+      if (mapboxToken) {
+        try {
+          const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${from.join(",")};${to.join(",")}?geometries=geojson&overview=full&access_token=${mapboxToken}`, { signal: controller.signal });
+          if (response.ok) {
+            const result = await response.json() as { routes?: Array<{ geometry?: { coordinates?: [number, number][] } }> };
+            if ((result.routes?.[0]?.geometry?.coordinates?.length ?? 0) > 1) coordinates = result.routes![0].geometry!.coordinates!;
           }
-        }),
-      );
-
-      if (isCancelled || Object.keys(fetchedRoutes).length === 0) return;
-
-      setRouteCoordinatesByPair((previous) => ({ ...previous, ...fetchedRoutes }));
-    };
-
-    void fetchRoutes();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [mapboxToken, mode, routeCoordinatesByPair, scopedRoutePairs]);
-
-  const hospitalNodeGeoJson = useMemo<FeatureCollection<Point>>(() => {
-    return {
-      type: "FeatureCollection",
-      features: hospitals.map((hospital) => ({
-        type: "Feature",
-        geometry: {
-          type: "Point",
-          coordinates: hospital.coordinates,
-        },
-        properties: {
-          hospitalId: hospital.id,
-          hospitalName: hospital.name,
-          city: hospital.city,
-        },
-      })),
-    };
-  }, [hospitals]);
-
-  const riskGeoJson = useMemo<FeatureCollection<Point>>(() => {
-    return {
-      type: "FeatureCollection",
-      features: hospitals.map((hospital) => {
-        const riskScore = forecasts
-          .filter((forecast) => forecast.hospitalId === hospital.id)
-          .reduce((max, forecast) => Math.max(max, forecast.shortageRiskScore), 0);
-
-        return {
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: hospital.coordinates,
-          },
-          properties: {
-            hospitalId: hospital.id,
-            hospitalName: hospital.name,
-            city: hospital.city,
-            riskScore,
-          },
-        };
-      }),
-    };
-  }, [forecasts, hospitals]);
-
-  const shipmentRouteGeoJson = useMemo<FeatureCollection<LineString>>(() => {
-    const features: Feature<LineString>[] = [];
-
-    for (const shipment of scopedShipments) {
-      const from = hospitalsById.get(shipment.fromHospitalId);
-      const to = hospitalsById.get(shipment.toHospitalId);
-      if (!from || !to) continue;
-
-      const routePairKey = createRoutePairKey(shipment.fromHospitalId, shipment.toHospitalId);
-      const routeCoordinates = routeCoordinatesByPair[routePairKey] ?? [from.coordinates, to.coordinates];
-
-      features.push({
-        type: "Feature",
-        geometry: {
-          type: "LineString",
-          coordinates: routeCoordinates,
-        },
-        properties: {
-          shipmentId: shipment.id,
-          status: shipment.status,
-          priority: shipment.priority,
-          bloodType: shipment.bloodType,
-          quantity: shipment.quantity,
-          etaMinutes: Math.round(shipment.etaMinutes),
-          progress: Math.round(shipment.progress * 100),
-          fromHospitalId: shipment.fromHospitalId,
-          toHospitalId: shipment.toHospitalId,
-        },
-      });
-    }
-
-    return {
-      type: "FeatureCollection",
-      features,
-    };
-  }, [hospitalsById, routeCoordinatesByPair, scopedShipments]);
-
-  const shipmentTruckGeoJson = useMemo<FeatureCollection<Point>>(() => {
-    const features: Feature<Point>[] = [];
-
-    for (const shipment of activeScopedShipments) {
-      const from = hospitalsById.get(shipment.fromHospitalId);
-      const to = hospitalsById.get(shipment.toHospitalId);
-      if (!from || !to) continue;
-
-      const routePairKey = createRoutePairKey(shipment.fromHospitalId, shipment.toHospitalId);
-      const routeCoordinates = routeCoordinatesByPair[routePairKey] ?? [from.coordinates, to.coordinates];
-      const routeProgress = shipment.status === "planned" || shipment.status === "approved" ? 0 : shipment.progress;
-      const fallbackCoordinates = interpolateOnRoute(routeCoordinates, routeProgress);
-
-      features.push({
-        type: "Feature",
-        geometry: {
-          type: "Point",
-          coordinates: fallbackCoordinates,
-        },
-        properties: {
-          shipmentId: shipment.id,
-          status: shipment.status,
-          priority: shipment.priority,
-          bloodType: shipment.bloodType,
-          quantity: shipment.quantity,
-          etaMinutes: Math.round(shipment.etaMinutes),
-          progress: Math.round(shipment.progress * 100),
-          fromHospitalId: shipment.fromHospitalId,
-          toHospitalId: shipment.toHospitalId,
-        },
-      });
-    }
-
-    return {
-      type: "FeatureCollection",
-      features,
-    };
-  }, [activeScopedShipments, hospitalsById, routeCoordinatesByPair]);
-
-  const selectedHospital = useMemo(() => {
-    if (!selectedHospitalId) return null;
-    return hospitalsById.get(selectedHospitalId) ?? null;
-  }, [hospitalsById, selectedHospitalId]);
-
-  const selectedHospitalForecasts = useMemo(() => {
-    if (!selectedHospitalId) return [];
-    return forecasts.filter((forecast) => forecast.hospitalId === selectedHospitalId);
-  }, [forecasts, selectedHospitalId]);
-
-  const topIssueForecasts = useMemo(() => {
-    return selectedHospitalForecasts
-      .filter((forecast) => forecast.shortageRiskLevel === "critical" || forecast.shortageRiskLevel === "high")
-      .sort((a, b) => b.shortageRiskScore - a.shortageRiskScore)
-      .slice(0, 3);
-  }, [selectedHospitalForecasts]);
-
-  const selectedHospitalMaxShortage = useMemo(() => {
-    return selectedHospitalForecasts.reduce<Forecast | null>((highest, forecast) => {
-      if (!highest || forecast.shortageRiskScore > highest.shortageRiskScore) return forecast;
-      return highest;
-    }, null);
-  }, [selectedHospitalForecasts]);
-
-  const selectedHospitalShipmentStats = useMemo(() => {
-    if (!selectedHospitalId) {
-      return { inboundActive: 0, outboundActive: 0, delayed: 0 };
-    }
-
-    return activeScopedShipments.reduce(
-      (acc, shipment) => {
-        if (shipment.toHospitalId === selectedHospitalId) acc.inboundActive += 1;
-        if (shipment.fromHospitalId === selectedHospitalId) acc.outboundActive += 1;
-        if (shipment.status === "delayed") acc.delayed += 1;
-        return acc;
-      },
-      { inboundActive: 0, outboundActive: 0, delayed: 0 },
-    );
-  }, [activeScopedShipments, selectedHospitalId]);
-
-  const selectedShipment = useMemo(() => {
-    if (!selectedShipmentId) return null;
-    return scopedShipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
-  }, [scopedShipments, selectedShipmentId]);
-
-  const selectedShipmentFromHospital = useMemo(() => {
-    if (!selectedShipment) return null;
-    return hospitalsById.get(selectedShipment.fromHospitalId) ?? null;
-  }, [hospitalsById, selectedShipment]);
-
-  const selectedShipmentToHospital = useMemo(() => {
-    if (!selectedShipment) return null;
-    return hospitalsById.get(selectedShipment.toHospitalId) ?? null;
-  }, [hospitalsById, selectedShipment]);
-
-  const handleMapClick = (event: InteractiveMapMouseEvent) => {
-    const feature = event.features?.[0];
-    if (!feature || !feature.properties) return;
-
-    const layerId = feature.layer?.id;
-    if (!layerId) return;
-
-    if (layerId === "hospital-risk-points" || layerId === "hospital-risk-hit") {
-      const hospitalId = String(feature.properties.hospitalId ?? "");
-      if (hospitalId) {
-        setSelectedHospitalId(hospitalId);
-        setSelectedShipmentId(null);
+        } catch { /* Keep the direct route when directions are unavailable. */ }
       }
-      return;
-    }
-
-    if (layerId === "hospital-nodes") {
-      const hospitalId = String(feature.properties.hospitalId ?? "");
-      if (hospitalId) {
-        setSelectedHospitalId(hospitalId);
-        setSelectedShipmentId(null);
-      }
-      return;
-    }
-
-    if (
-      layerId === "shipment-routes" ||
-      layerId === "shipment-routes-hit" ||
-      layerId === "shipment-routes-selected" ||
-      layerId === "shipment-trucks"
-    ) {
-      const shipmentId = String(feature.properties.shipmentId ?? "");
-      if (shipmentId) {
-        setSelectedShipmentId(shipmentId);
-      }
-    }
-  };
-
-  const interactiveLayerIds =
-    mode === "riskHeatmap"
-      ? ["hospital-risk-hit", "hospital-risk-points"]
-      : ["shipment-routes-hit", "shipment-routes", "shipment-routes-selected", "shipment-trucks", "hospital-nodes"];
-
-  const focusMapForContext = useCallback((animate: boolean) => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (mode === "riskHeatmap") {
-      map.fitBounds(BULGARIA_BOUNDS, {
-        padding: 48,
-        maxZoom: 7.2,
-        duration: animate ? 900 : 0,
-      });
-      return;
-    }
-
-    if (highlightedHospitalLongitude !== null && highlightedHospitalLatitude !== null) {
-      map.flyTo({
-        center: [highlightedHospitalLongitude, highlightedHospitalLatitude],
-        zoom: HOSPITAL_VIEW_ZOOM,
-        duration: animate ? 800 : 0,
-      });
-      return;
-    }
-
-    map.flyTo({
-      center: [DEFAULT_VIEW_STATE.longitude, DEFAULT_VIEW_STATE.latitude],
-      zoom: DEFAULT_VIEW_STATE.zoom,
-      duration: animate ? 800 : 0,
+      return [key, coordinates] as const;
+    })).then((results) => {
+      if (!controller.signal.aborted) setRouteCoordinates(Object.fromEntries(results.filter((item) => item !== null)));
     });
-  }, [highlightedHospitalLatitude, highlightedHospitalLongitude, mode]);
+    return () => controller.abort();
+  }, [mapboxToken, routePairsKey]);
 
-  useEffect(() => {
-    const contextKey = `${mode}:${highlightedHospitalId ?? "none"}`;
-    if (lastContextKeyRef.current === contextKey) return;
-
-    lastContextKeyRef.current = contextKey;
-    focusMapForContext(false);
-  }, [focusMapForContext, highlightedHospitalId, mode]);
-
-  const handleReset = () => {
-    focusMapForContext(true);
+  const routeFor = (shipment: Shipment): [number, number][] | null => {
+    const from = hospitalById.get(shipment.fromHospitalId);
+    const to = hospitalById.get(shipment.toHospitalId);
+    return from && to ? routeCoordinates[pairKey(shipment)] ?? [from.coordinates, to.coordinates] : null;
+  };
+  const routes: FeatureCollection<LineString> = { type: "FeatureCollection", features: activeShipments.flatMap((shipment) => {
+    const coordinates = routeFor(shipment);
+    return coordinates ? [{ type: "Feature" as const, geometry: { type: "LineString" as const, coordinates }, properties: { shipmentId: shipment.id, color: routeColors[shipment.status] } }] : [];
+  }) };
+  const selectedHospital = hospitalById.get(selectedHospitalId ?? "");
+  const selectedShipment = activeShipments.find((item) => item.id === selectedShipmentId);
+  const chooseHospital = (id: string) => { setSelectedHospitalId(id); setSelectedShipmentId(null); };
+  const chooseShipment = (id: string) => { setSelectedShipmentId(id); setSelectedHospitalId(null); };
+  const resetView = () => mapRef.current?.fitBounds(BULGARIA_BOUNDS, { padding: 44, maxZoom: 7.2, duration: 500 });
+  const onMapClick = (event: MapMouseEvent) => {
+    const shipmentId = event.features?.[0]?.properties?.shipmentId;
+    if (shipmentId) chooseShipment(String(shipmentId));
   };
 
-  if (!mapboxToken) {
-    return (
-      <div className="flex h-full w-full items-center justify-center rounded-[inherit] bg-slate-100 text-sm text-slate-500">
-        Липсва ключ за достъп до картата
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative h-[340px] w-full overflow-hidden rounded-[inherit] sm:h-[420px] lg:h-[500px]">
-      <div className="absolute left-3 top-3 z-10 hidden rounded-md border border-slate-200 bg-white/95 px-3 py-2 font-mono text-xs text-slate-700 shadow-sm sm:block">
-        Географска дължина: {center[0].toFixed(4)} | Ширина: {center[1].toFixed(4)} | Мащаб: {zoom.toFixed(2)}
-      </div>
-
-      <button
-        type="button"
-        onClick={handleReset}
-        className="absolute left-3 top-14 z-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
-      >
-        Начален изглед
-      </button>
-
-      <MapView
-        ref={mapRef}
-        mapboxAccessToken={mapboxToken}
-        mapStyle="mapbox://styles/mapbox/light-v11"
-        locale={MAP_LOCALE}
-        language="bg"
-        initialViewState={initialViewState}
-        maxZoom={20}
-        minZoom={3}
-        style={{ width: "100%", height: "100%", backgroundColor: "#f8fafc" }}
-        attributionControl={false}
-        interactiveLayerIds={interactiveLayerIds}
-        onClick={handleMapClick}
-        onLoad={() => {
-          lastContextKeyRef.current = `${mode}:${highlightedHospitalId ?? "none"}`;
-          focusMapForContext(false);
-        }}
-        onMove={(event) => {
-          setCenter([event.viewState.longitude, event.viewState.latitude]);
-          setZoom(event.viewState.zoom);
-        }}
-      >
+  return <div>
+    {!mapReady && !mapError && <AppLoadingScreen overlay />}
+    <div className="relative h-[420px] w-full overflow-hidden bg-slate-100 sm:h-[560px] [&_.mapboxgl-ctrl-logo]:hidden">
+      <MapView ref={mapRef} mapboxAccessToken={mapboxToken} mapStyle="mapbox://styles/mapbox/light-v11"
+        locale={MAP_LOCALE} language="bg" initialViewState={{ longitude: 25.4, latitude: 42.7, zoom: 6.4 }}
+        maxBounds={BULGARIA_MAX_BOUNDS} minZoom={5.5} maxZoom={16} renderWorldCopies={false} attributionControl={false}
+        style={{ width: "100%", height: "100%" }} interactiveLayerIds={["active-shipment-routes", "active-shipment-routes-hit"]}
+        onClick={onMapClick} onLoad={() => { setMapError(false); mapRef.current?.fitBounds(BULGARIA_BOUNDS, { padding: 44, maxZoom: 7.2, duration: 0 }); }}
+        onIdle={() => setMapReady(true)}
+        onError={() => setMapError(true)}>
         <NavigationControl position="top-right" />
-        {mode === "riskHeatmap" ? (
-          <Source id="hospital-risk" type="geojson" data={riskGeoJson}>
-            <Layer {...heatmapLayer} />
-            <Layer {...riskHitLayer} />
-            <Layer {...riskPointLayer} />
-            {selectedHospitalId ? (
-              <Layer {...createSelectedRiskPointLayer(selectedHospitalId)} />
-            ) : null}
-          </Source>
-        ) : (
-          <>
-            <Source id="hospital-nodes" type="geojson" data={hospitalNodeGeoJson}>
-              <Layer {...hospitalNodeLayer} />
-              {selectedHospitalId ? (
-                <Layer {...createHighlightedHospitalNodeLayer(selectedHospitalId)} />
-              ) : null}
-            </Source>
-
-            <Source id="shipment-routes" type="geojson" data={shipmentRouteGeoJson}>
-              <Layer {...shipmentRouteHitLayer} />
-              <Layer {...shipmentRouteLayer} />
-              {selectedShipmentId ? (
-                <Layer {...createSelectedShipmentRouteLayer(selectedShipmentId)} />
-              ) : null}
-            </Source>
-
-            <Source id="shipment-trucks" type="geojson" data={shipmentTruckGeoJson}>
-              <Layer {...shipmentTruckLayer} />
-            </Source>
-          </>
-        )}
+        <Source id="bulgaria-territory" type="geojson" data={BULGARIA_BOUNDARY}>
+          <Layer id="bulgaria-tint" type="fill" paint={{ "fill-color": "#e8f4ef", "fill-opacity": 0.13 }} />
+        </Source>
+        <Source id="active-routes" type="geojson" data={routes}>
+          <Layer {...routeHitLayer} /><Layer {...routeLayer} />
+        </Source>
+        <Source id="outside-bulgaria" type="geojson" data={OUTSIDE_BULGARIA_MASK}>
+          <Layer id="outside-bulgaria-mask" type="fill" paint={{ "fill-color": "#f1f5f9", "fill-opacity": 1 }} />
+        </Source>
+        <Source id="bulgaria-border" type="geojson" data={BULGARIA_BOUNDARY}>
+          <Layer id="bulgaria-border-line" type="line" paint={{ "line-color": "#94a3b8", "line-width": 2 }} />
+        </Source>
+        {activeShipments.filter((item) => item.status === "in_transit" || item.status === "delayed").map((shipment) => {
+          const route = routeFor(shipment);
+          if (!route) return null;
+          const [longitude, latitude] = positionOnRoute(route, shipment.progress);
+          return <Marker key={shipment.id} longitude={longitude} latitude={latitude} offset={[0, 22]}>
+            <button type="button" aria-label={`Проследяване: ${shipment.bloodType}, ${shipment.quantity} единици`} title={`${formatHospitalLabel(hospitalById.get(shipment.fromHospitalId))} → ${formatHospitalLabel(hospitalById.get(shipment.toHospitalId))}`}
+              className="rounded-full border-2 bg-white p-2 shadow-md" style={{ borderColor: routeColors[shipment.status], color: routeColors[shipment.status] }} onClick={(event) => { event.stopPropagation(); chooseShipment(shipment.id); }}><Truck size={17} /></button>
+          </Marker>;
+        })}
+        {hospitals.map((facility) => {
+          const Icon = facility.kind === "hospital" ? HospitalIcon : Building2;
+          const color = facility.kind === "national_center" ? "#e85a39" : facility.kind === "regional_center" ? "#2563eb" : "#059669";
+          return <Marker key={facility.id} longitude={facility.coordinates[0]} latitude={facility.coordinates[1]} anchor="bottom">
+            <button type="button" aria-label={`Наличности: ${facility.name}`} title={facility.name}
+              className="flex max-w-[180px] flex-col items-center gap-1 text-center" onClick={(event) => { event.stopPropagation(); chooseHospital(facility.id); }}>
+              <span className="hidden rounded-lg border border-slate-200 bg-white/95 px-2 py-1 text-xs font-semibold text-slate-900 shadow-sm sm:block">{shortLabel(facility)}</span>
+              <span className="rounded-full border-[3px] border-white p-2 text-white shadow-md" style={{ backgroundColor: color }}><Icon size={19} /></span>
+            </button>
+          </Marker>;
+        })}
       </MapView>
-
-      <Sheet
-        open={mode === "riskHeatmap" && !!selectedHospital}
-        onOpenChange={(open) => {
-          if (!open) setSelectedHospitalId(null);
-        }}
-      >
-        {mode === "riskHeatmap" && selectedHospital ? (
-          <SheetContent side="right" className={sheetStyles.bloodTypeSheetContent}>
-            <SheetHeader className={sheetStyles.bloodTypeSheetHeader}>
-              <div className={sheetStyles.bloodTypeSheetHeadingRow}>
-                <div className={sheetStyles.bloodTypeSheetTitleRow}>
-                  <SheetTitle className={sheetStyles.bloodTypeSheetTitle}>{formatHospitalLabel(selectedHospital)}</SheetTitle>
-                </div>
-                <SheetDescription className={sheetStyles.bloodTypeSheetDescription}>
-                  Основни показатели и рискове за лечебното заведение
-                </SheetDescription>
-              </div>
-            </SheetHeader>
-            <div className={sheetStyles.bloodTypeSheetBody}>
-              <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
-                <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
-                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Обобщение за лечебното заведение</CardTitle>
-                </CardHeader>
-                <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
-                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Най-голям недостиг</span>
-                    <span className={sheetStyles.bloodTypeSheetMetricValue}>
-                      {selectedHospitalMaxShortage?.bloodType ?? "няма данни"}
-                    </span>
-                  </div>
-                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Риск от недостиг</span>
-                    <span className={sheetStyles.bloodTypeSheetMetricValue}>
-                      {Math.round(selectedHospitalMaxShortage?.shortageRiskScore ?? 0)}
-                    </span>
-                  </div>
-                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Активни входящи пратки</span>
-                    <span className={sheetStyles.bloodTypeSheetMetricValue}>{selectedHospitalShipmentStats.inboundActive}</span>
-                  </div>
-                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Активни изходящи пратки</span>
-                    <span className={sheetStyles.bloodTypeSheetMetricValue}>{selectedHospitalShipmentStats.outboundActive}</span>
-                  </div>
-                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>Забавени маршрути</span>
-                    <span className={sheetStyles.bloodTypeSheetMetricValue}>{selectedHospitalShipmentStats.delayed}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
-                <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
-                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Показатели за риск</CardTitle>
-                </CardHeader>
-                <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
-                  {topIssueForecasts.length > 0 ? (
-                    <div className="space-y-2">
-                      {topIssueForecasts.map((forecast) => (
-                        <div key={`${forecast.hospitalId}-${forecast.bloodType}`} className={sheetStyles.bloodTypeSheetBulletRow}>
-                          <span className={sheetStyles.bloodTypeSheetBullet} />
-                          <span className={sheetStyles.bloodTypeSheetMetricLabel}>
-                            {forecast.bloodType}: {Math.round(forecast.shortageRiskScore)} риск, потребност {forecast.predictedDemand24h} ед.
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className={sheetStyles.bloodTypeSheetEmptyState}>Няма критичен или висок риск от недостиг.</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {selectedHospital.alerts.length > 0 ? (
-                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
-                  <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
-                    <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Известия</CardTitle>
-                  </CardHeader>
-                  <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
-                    {selectedHospital.alerts.slice(0, 2).map((alert) => (
-                      <div key={alert} className={sheetStyles.bloodTypeSheetBulletRow}>
-                        <span className={sheetStyles.bloodTypeSheetBullet} />
-                        <span className={sheetStyles.bloodTypeSheetMetricLabel}>{alert}</span>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              ) : null}
-            </div>
-          </SheetContent>
-        ) : null}
-      </Sheet>
-
-      <Sheet
-        open={mode === "base" && !!selectedShipment}
-        onOpenChange={(open) => {
-          if (!open) setSelectedShipmentId(null);
-        }}
-      >
-        {mode === "base" && selectedShipment ? (
-          <SheetContent side="right" className={sheetStyles.bloodTypeSheetContent}>
-            <SheetHeader className={sheetStyles.bloodTypeSheetHeader}>
-              <div className={sheetStyles.bloodTypeSheetHeadingRow}>
-                <div className={sheetStyles.bloodTypeSheetTitleRow}>
-                  <SheetTitle className={sheetStyles.bloodTypeSheetTitle}>Проследяване на пратката</SheetTitle>
-                </div>
-                <SheetDescription className={sheetStyles.bloodTypeSheetDescription}>
-                  {selectedShipment.bloodType} - {selectedShipment.quantity} ед.
-                </SheetDescription>
-              </div>
-            </SheetHeader>
-            <div className={sheetStyles.bloodTypeSheetBody}>
-              <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetCard)}>
-                <CardHeader className={sheetStyles.bloodTypeSheetCardHeader}>
-                  <CardTitle className={sheetStyles.bloodTypeSheetCardTitle}>Маршрут</CardTitle>
-                </CardHeader>
-                <CardContent className={sheetStyles.bloodTypeSheetListCardContent}>
-                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>От</span>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>{formatHospitalLabel(selectedShipmentFromHospital)}</span>
-                  </div>
-                  <div className={sheetStyles.bloodTypeSheetMetricRow}>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>До</span>
-                    <span className={sheetStyles.bloodTypeSheetMetricLabel}>{formatHospitalLabel(selectedShipmentToHospital)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className={sheetStyles.bloodTypeSheetStatsGrid}>
-                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
-                  <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
-                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Състояние</p>
-                    <p className={sheetStyles.bloodTypeSheetStatValue}>{SHIPMENT_STATUS_LABELS[selectedShipment.status]}</p>
-                  </CardContent>
-                </Card>
-                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
-                  <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
-                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Приоритет</p>
-                    <p className={sheetStyles.bloodTypeSheetStatValue}>{PRIORITY_LABELS[selectedShipment.priority]}</p>
-                  </CardContent>
-                </Card>
-                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
-                  <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
-                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Напредък</p>
-                    <p className={sheetStyles.bloodTypeSheetStatValue}>{Math.round(selectedShipment.progress * 100)}%</p>
-                  </CardContent>
-                </Card>
-                <Card className={cn(surfaceStyles.dashboardCardSurface, sheetStyles.bloodTypeSheetStatCard)}>
-                  <CardContent className={sheetStyles.bloodTypeSheetStatContent}>
-                    <p className={sheetStyles.bloodTypeSheetStatLabel}>Очаквано пристигане</p>
-                    <p className={sheetStyles.bloodTypeSheetStatValue}>{formatMinutes(selectedShipment.etaMinutes)}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </SheetContent>
-        ) : null}
-      </Sheet>
-
-      {mode === "base" ? (
-        <div className="absolute bottom-3 left-3 z-10 hidden rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-[11px] text-slate-700 shadow-sm sm:block">
-          <p className="font-semibold text-slate-900">Легенда на маршрутите</p>
-          <p>тюркоазено: в движение | жълто: забавена | синьо: одобрена | сиво: планирана</p>
-          <p>Изберете маршрут или маркер за подробности за пратката.</p>
+      <button type="button" className="absolute left-3 top-3 rounded-lg border bg-white px-3 py-2 text-sm shadow-sm" onClick={resetView}>Цяла България</button>
+      <div className="pointer-events-none absolute bottom-3 left-3 z-10 w-fit max-w-[calc(100%-1.5rem)] space-y-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm">
+        <p className="font-bold text-slate-900">Легенда на маршрутите</p>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {(["in_transit", "delayed", "approved", "planned"] as const).map((status) => <span key={status} className="inline-flex items-center gap-1.5"><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: routeColors[status] }} />{SHIPMENT_STATUS_LABELS[status]}</span>)}
         </div>
-      ) : null}
+        <p>Изберете маршрут или маркер за подробности за пратката.</p>
+      </div>
     </div>
-  );
+    {mapError && <p role="status" className="px-4 pt-3 text-sm text-amber-700">Фоновата карта не се зареди изцяло. Наличностите и списъкът с пратки остават достъпни по-долу.</p>}
+    <div className="space-y-3 p-4">
+      <p className="text-sm font-semibold">Обекти в мрежата</p>
+      <div className="grid gap-2 sm:grid-cols-3">{hospitals.map((facility) => <button key={facility.id} type="button" className="rounded-xl border p-3 text-left text-sm hover:bg-slate-50" onClick={() => chooseHospital(facility.id)}><span className="block font-semibold">{facility.name}</span><span className="text-muted-foreground">{facility.city} · {FACILITY_ROLE_LABELS[facility.kind]}</span></button>)}</div>
+      <p className="text-sm font-semibold">Текущи прехвърляния ({activeShipments.length})</p>
+      {activeShipments.length === 0 && <p className="text-sm text-muted-foreground">Няма активни пратки.</p>}
+      <div className="grid gap-2 md:grid-cols-2">{activeShipments.map((shipment) => <button key={shipment.id} type="button" className="space-y-1 rounded-xl border p-3 text-left text-sm hover:bg-slate-50" onClick={() => chooseShipment(shipment.id)}>
+        <span className="block font-semibold">{shipment.bloodType} · {shipment.quantity} ед. · {SHIPMENT_STATUS_LABELS[shipment.status]}</span>
+        <span className="block">От {formatHospitalLabel(hospitalById.get(shipment.fromHospitalId))}</span><span className="block">До {formatHospitalLabel(hospitalById.get(shipment.toHospitalId))}</span>
+        <span className="block text-muted-foreground">Очаквано пристигане {formatMinutes(shipment.etaMinutes)}</span>
+      </button>)}</div>
+    </div>
+    <Sheet open={!!selectedHospital} onOpenChange={(open) => { if (!open) setSelectedHospitalId(null); }}>
+      {selectedHospital && <SheetContent side="right" className="w-full overflow-y-auto p-5 sm:max-w-lg">
+        <SheetHeader className="pr-8"><SheetTitle>{selectedHospital.name}</SheetTitle><SheetDescription>{FACILITY_ROLE_LABELS[selectedHospital.kind]} · {selectedHospital.city}</SheetDescription></SheetHeader>
+        <h2 className="text-base font-semibold">Кръвни наличности</h2>
+        <div className="grid grid-cols-2 gap-3">{BLOOD_TYPES.map((type) => <div key={type} className="flex items-center justify-between rounded-xl border p-3"><span className="font-semibold">{type}</span><span>{selectedHospital.inventoryByBloodType[type] ?? 0} ед.</span></div>)}</div>
+        <h2 className="mt-2 text-base font-semibold">Текущи пратки на обекта</h2>
+        {activeShipments.filter((item) => item.fromHospitalId === selectedHospital.id || item.toHospitalId === selectedHospital.id).map((item) => <button key={item.id} type="button" className="space-y-1 rounded-xl border p-3 text-left text-sm" onClick={() => chooseShipment(item.id)}><span className="block font-semibold">{item.bloodType} · {item.quantity} ед. · {SHIPMENT_STATUS_LABELS[item.status]}</span><span className="block">{formatHospitalLabel(hospitalById.get(item.fromHospitalId))} → {formatHospitalLabel(hospitalById.get(item.toHospitalId))}</span></button>)}
+        {!activeShipments.some((item) => item.fromHospitalId === selectedHospital.id || item.toHospitalId === selectedHospital.id) && <p className="text-sm text-muted-foreground">Няма активни пратки.</p>}
+      </SheetContent>}
+    </Sheet>
+    <Sheet open={!!selectedShipment} onOpenChange={(open) => { if (!open) setSelectedShipmentId(null); }}>
+      {selectedShipment && <SheetContent side="right" className="w-full overflow-y-auto p-5 sm:max-w-lg">
+        <SheetHeader className="pr-8"><SheetTitle>Проследяване на пратката</SheetTitle><SheetDescription>{selectedShipment.bloodType} · {selectedShipment.quantity} ед.</SheetDescription></SheetHeader>
+        <Badge variant="outline" className="w-fit">{SHIPMENT_STATUS_LABELS[selectedShipment.status]}</Badge>
+        <div className="space-y-3 rounded-xl border p-4 text-sm"><p><strong>От:</strong> {formatHospitalLabel(hospitalById.get(selectedShipment.fromHospitalId))}</p><p><strong>До:</strong> {formatHospitalLabel(hospitalById.get(selectedShipment.toHospitalId))}</p></div>
+        <p className="text-sm">Приоритет: {PRIORITY_LABELS[selectedShipment.priority]}</p><p className="text-sm">Очаквано пристигане: {formatMinutes(selectedShipment.etaMinutes)}</p><p className="text-sm">Напредък: {Math.round(selectedShipment.progress * 100)}%</p>
+        {selectedShipment.progress >= 1 && <p className="text-sm text-amber-700">Пристигнала · очаква потвърждение за получаване</p>}
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-cyan-500" style={{ width: `${selectedShipment.progress * 100}%` }} /></div>
+      </SheetContent>}
+    </Sheet>
+  </div>;
 }

@@ -4,6 +4,7 @@
   min-height: 100dvh;
   box-sizing: border-box;
   overflow: hidden;
+  background: url("/background.png") center center / cover no-repeat, #f8fafc;
 }
 
 .mainViewProvider {

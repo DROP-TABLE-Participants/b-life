@@ -8,18 +8,24 @@ import { runRedistributionEngine } from "@/lib/redistribution";
 import { getAppState, resetAppState, saveAppState } from "@/lib/storage";
 import { createSeedAppState, seededHospitals } from "@/lib/seed";
 import { describeTransfer } from "@/lib/labels";
-import { lerpCoordinates } from "@/lib/utils";
-import type { AppState, ManualShipmentDraft, SessionState, Shipment, ShipmentStatus } from "@/types/domain";
+import { distanceKmBetween, lerpCoordinates } from "@/lib/utils";
+import { availableInventoryUnits as availableUnits, eligibleOrderSuppliers } from "@/lib/inventory";
+import type { AppState, BloodOrder, BloodOrderDraft, ManualShipmentDraft, SessionState, Shipment, ShipmentStatus } from "@/types/domain";
 
 interface AppStore extends AppState {
   initialized: boolean;
   initialize: () => void;
+  syncFromStorage: () => void;
   setSession: (session: SessionState) => void;
   setSimulationDate: (isoDate: string) => void;
   setSimulationDemandMultiplier: (multiplier: number) => void;
   setSimulationShipmentSpeed: (speed: number) => void;
   updateHospitalInventory: (hospitalId: string, bloodType: Shipment["bloodType"], units: number) => void;
   scheduleManualShipment: (draft: ManualShipmentDraft) => boolean;
+  placeBloodOrder: (draft: BloodOrderDraft) => boolean;
+  acceptBloodOrder: (orderId: string) => boolean;
+  rejectBloodOrder: (orderId: string) => boolean;
+  cancelBloodOrder: (orderId: string) => boolean;
   approveRecommendation: (recommendationId: string) => void;
   dispatchRecommendation: (recommendationId: string) => void;
   dispatchShipment: (shipmentId: string) => void;
@@ -62,6 +68,7 @@ const applyAndPersist = (state: AppStore, partial: Partial<AppState>): Partial<A
   const merged = synthesizeState({
     version: state.version, seededAt: state.seededAt, lastUpdated: state.lastUpdated,
     hospitals: partial.hospitals ?? state.hospitals, shipments: partial.shipments ?? state.shipments,
+    orders: partial.orders ?? state.orders,
     forecasts: partial.forecasts ?? state.forecasts, recommendations: partial.recommendations ?? state.recommendations,
     kpis: partial.kpis ?? state.kpis, session: partial.session ?? state.session, simulation: partial.simulation ?? state.simulation,
   });
@@ -71,13 +78,6 @@ const applyAndPersist = (state: AppStore, partial: Partial<AppState>): Partial<A
 
 const defaultState = synthesizeState(createSeedAppState());
 const generateShipmentId = () => `ship-manual-${crypto.randomUUID()}`;
-
-const availableUnits = (state: AppState, facilityId: string, bloodType: Shipment["bloodType"], excludingId?: string): number => {
-  const onHand = state.hospitals.find((item) => item.id === facilityId)?.inventoryByBloodType[bloodType] ?? 0;
-  const reserved = state.shipments.filter((item) => item.id !== excludingId && item.fromHospitalId === facilityId && item.bloodType === bloodType && isReserved(item))
-    .reduce((sum, item) => sum + item.quantity, 0);
-  return Math.max(0, onHand - reserved);
-};
 
 const deductInventory = (state: AppState, shipment: Pick<Shipment, "fromHospitalId" | "bloodType" | "quantity">) =>
   state.hospitals.map((hospital) => hospital.id !== shipment.fromHospitalId ? hospital : {
@@ -95,6 +95,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const hydrated = synthesizeState(getAppState() ?? createSeedAppState());
     saveAppState(hydrated);
     set({ ...hydrated, initialized: true });
+  },
+
+  syncFromStorage: () => {
+    const saved = getAppState();
+    if (!saved) return;
+    // Share network data between open tabs while each keeps its selected account.
+    set({ ...synthesizeState({ ...saved, session: get().session }), initialized: true });
   },
 
   setSession: (session) => {
@@ -154,6 +161,73 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return created;
   },
 
+  placeBloodOrder: (draft) => {
+    let created = false;
+    set((state) => {
+      if (!canOperateFacility(state.session, draft.requesterHospitalId) ||
+        !["low", "medium", "high", "critical"].includes(draft.priority) ||
+        !eligibleOrderSuppliers(state, draft.requesterHospitalId, draft.bloodType, draft.quantity)
+          .some((item) => item.id === draft.supplierHospitalId)) return state;
+      const timestamp = new Date().toISOString();
+      const order: BloodOrder = {
+        requesterHospitalId: draft.requesterHospitalId, supplierHospitalId: draft.supplierHospitalId,
+        bloodType: draft.bloodType, quantity: draft.quantity, priority: draft.priority,
+        id: `order-${crypto.randomUUID()}`, status: "pending", createdAt: timestamp, updatedAt: timestamp,
+      };
+      created = true;
+      return applyAndPersist(state, { orders: [order, ...state.orders] });
+    });
+    return created;
+  },
+
+  acceptBloodOrder: (orderId) => {
+    let accepted = false;
+    set((state) => {
+      const order = state.orders.find((item) => item.id === orderId);
+      if (!order || order.status !== "pending" || !canOperateFacility(state.session, order.supplierHospitalId) ||
+        order.quantity > availableUnits(state, order.supplierHospitalId, order.bloodType) ||
+        state.shipments.some((item) => item.orderId === order.id)) return state;
+      const from = state.hospitals.find((item) => item.id === order.supplierHospitalId);
+      const to = state.hospitals.find((item) => item.id === order.requesterHospitalId);
+      if (!from || !to) return state;
+      const timestamp = new Date().toISOString();
+      const shipment: Shipment = {
+        id: generateShipmentId(), orderId, fromHospitalId: from.id, toHospitalId: to.id,
+        bloodType: order.bloodType, quantity: order.quantity, priority: order.priority, status: "approved",
+        etaMinutes: Math.max(15, Math.round(distanceKmBetween(from.coordinates, to.coordinates) / 68 * 60)),
+        progress: 0, currentCoordinates: from.coordinates, createdAt: timestamp, updatedAt: timestamp,
+      };
+      accepted = true;
+      return applyAndPersist(state, {
+        shipments: [shipment, ...state.shipments],
+        orders: state.orders.map((item) => item.id === orderId ? { ...item, status: "accepted", shipmentId: shipment.id, updatedAt: timestamp } : item),
+      });
+    });
+    return accepted;
+  },
+
+  rejectBloodOrder: (orderId) => {
+    let rejected = false;
+    set((state) => {
+      const order = state.orders.find((item) => item.id === orderId);
+      if (!order || order.status !== "pending" || !canOperateFacility(state.session, order.supplierHospitalId)) return state;
+      rejected = true;
+      return applyAndPersist(state, { orders: state.orders.map((item) => item.id === orderId ? { ...item, status: "rejected", updatedAt: new Date().toISOString() } : item) });
+    });
+    return rejected;
+  },
+
+  cancelBloodOrder: (orderId) => {
+    let cancelled = false;
+    set((state) => {
+      const order = state.orders.find((item) => item.id === orderId);
+      if (!order || order.status !== "pending" || !canOperateFacility(state.session, order.requesterHospitalId)) return state;
+      cancelled = true;
+      return applyAndPersist(state, { orders: state.orders.map((item) => item.id === orderId ? { ...item, status: "cancelled", updatedAt: new Date().toISOString() } : item) });
+    });
+    return cancelled;
+  },
+
   approveRecommendation: (recommendationId) => {
     set((state) => {
       const recommendation = state.recommendations.find((item) => item.id === recommendationId);
@@ -211,6 +285,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           hospitals,
           shipments: state.shipments.map((item) => item.id === shipmentId ? { ...item, status: "delivered", progress: 1, etaMinutes: 0, currentCoordinates: destination.coordinates, updatedAt: new Date().toISOString() } : item),
           recommendations: state.recommendations.map((item) => item.id === shipment.recommendationId ? { ...item, status: "fulfilled" } : item),
+          orders: state.orders.map((item) => item.id === shipment.orderId ? { ...item, status: "fulfilled", updatedAt: new Date().toISOString() } : item),
         });
       }
       if (!canOperateFacility(state.session, shipment.fromHospitalId)) return state;
@@ -218,7 +293,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
         (status === "approved" && shipment.status === "planned") ||
         (status === "delayed" && shipment.status === "in_transit");
       if (!valid) return state;
-      return applyAndPersist(state, { shipments: state.shipments.map((item) => item.id === shipmentId ? { ...item, status, updatedAt: new Date().toISOString() } : item) });
+      return applyAndPersist(state, {
+        shipments: state.shipments.map((item) => item.id === shipmentId ? { ...item, status, updatedAt: new Date().toISOString() } : item),
+        orders: status === "cancelled" ? state.orders.map((item) => item.id === shipment.orderId ? { ...item, status: "cancelled", updatedAt: new Date().toISOString() } : item) : state.orders,
+      });
     });
   },
 

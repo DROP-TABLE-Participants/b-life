@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PRIORITY_LABELS } from "@/lib/labels";
+import { availableInventoryUnits } from "@/lib/inventory";
 import { BLOOD_TYPES, type Hospital, type ManualShipmentDraft, type Shipment } from "@/types/domain";
 
 interface ShipmentComposerProps {
@@ -25,7 +26,7 @@ export function ShipmentComposer({ hospital, hospitals, shipments, onSchedule }:
   const [message, setMessage] = useState("");
   const reserved = shipments.filter((item) => item.fromHospitalId === hospital.id && item.bloodType === bloodType &&
     (item.status === "planned" || item.status === "approved")).reduce((sum, item) => sum + item.quantity, 0);
-  const available = Math.max(0, (hospital.inventoryByBloodType[bloodType] ?? 0) - reserved);
+  const available = availableInventoryUnits({ hospitals, shipments }, hospital.id, bloodType);
 
   return (
     <form className="space-y-4" onSubmit={(event) => {

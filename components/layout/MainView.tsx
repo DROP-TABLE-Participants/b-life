@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { BadgeCheck, ChevronsUpDown, House, LogOut } from "lucide-react";
+import { Activity, BadgeCheck, Boxes, ChartNoAxesCombined, ChevronsUpDown, ClipboardList, House, LogOut, MapPinned, Route, Truck } from "lucide-react";
+import type { AdminSection } from "@/lib/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -38,7 +40,10 @@ import logo from "@/public/b.life-logo.png";
 interface MainViewNavigationItem {
   label: string;
   href: string;
+  icon?: AdminSection;
 }
+
+const navigationIcons = { overview: House, inventory: Boxes, forecast: ChartNoAxesCombined, orders: ClipboardList, shipments: Truck, recommendations: Route, map: MapPinned };
 
 interface MainViewLogin {
   title: string;
@@ -63,6 +68,11 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { open } = useSidebar();
+  const scrollPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollPanelRef.current?.scrollTo({ top: 0 });
+  }, [pathname]);
 
   return (
     <div className={styles.mainViewLayout}>
@@ -93,15 +103,16 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
               <SidebarMenu>
                 {navigation.map((item) => {
                   const isActive = pathname === item.href;
+                  const Icon = item.icon ? navigationIcons[item.icon] : Activity;
 
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
-                        render={<Link href={item.href} />}
+                        render={<Link href={item.href} aria-current={isActive ? "page" : undefined} />}
                         isActive={isActive}
                         tooltip={item.label}
                       >
-                          <House size={18} />
+                          <Icon size={18} />
                           <span>{item.label}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -180,7 +191,7 @@ function MainViewContent({ navigation, login, children }: MainViewProps) {
       </Sidebar>
 
       <SidebarInset className={styles.mainViewRouterView}>
-        <Card className={styles.mainViewRouterCard}>
+        <Card ref={scrollPanelRef} className={styles.mainViewRouterCard}>
           <CardContent className={styles.mainViewRouterCardContent}>
             <div className={styles.mainViewMobileTopBar}>
               <SidebarTrigger className={styles.mainViewMobileTrigger} />

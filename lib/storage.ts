@@ -18,6 +18,14 @@ const safeParse = (value: string): AppState | null => {
     if (!parsed.shipments.every((item) => item && facilityIds.has(item.fromHospitalId) && facilityIds.has(item.toHospitalId) &&
       BLOOD_TYPE_LIST.includes(item.bloodType) && Number.isInteger(item.quantity) && item.quantity > 0 &&
       ["planned", "approved", "in_transit", "delayed", "delivered", "cancelled"].includes(item.status))) return null;
+    // Add orders to existing saved accounts without resetting inventories or shipments.
+    if (parsed.orders === undefined) parsed.orders = [];
+    if (!Array.isArray(parsed.orders) || !parsed.orders.every((item) => item && typeof item.id === "string" &&
+      facilityIds.has(item.requesterHospitalId) && facilityIds.has(item.supplierHospitalId) &&
+      item.requesterHospitalId !== item.supplierHospitalId && BLOOD_TYPE_LIST.includes(item.bloodType) &&
+      Number.isSafeInteger(item.quantity) && item.quantity > 0 && ["low", "medium", "high", "critical"].includes(item.priority) &&
+      ["pending", "accepted", "rejected", "cancelled", "fulfilled"].includes(item.status) &&
+      (item.shipmentId === undefined || parsed.shipments.some((shipment) => shipment.id === item.shipmentId && shipment.orderId === item.id)))) return null;
     const sessionFacility = parsed.hospitals.find((item) => item.id === parsed.session?.hospitalId);
     if (!parsed.session || !((parsed.session.mode === null && parsed.session.hospitalId === null) ||
       (parsed.session.mode === "control_tower" && parsed.session.hospitalId === null) || sessionFacility?.kind === parsed.session.mode)) {

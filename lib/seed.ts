@@ -59,7 +59,7 @@ export const createSeedAppState = (): AppState => {
   // Stock is physically on hand: delivered units are included and in-transit units have left the sender.
   return {
     version: APP_STATE_VERSION, seededAt: nowIso(), lastUpdated: nowIso(), hospitals, shipments,
-    forecasts: [], recommendations: [],
+    forecasts: [], recommendations: [], orders: [],
     kpis: { totalHospitals: hospitals.length, activeShipments: 0, criticalShortages: 0, expiringUnitsRisk: 0, redistributionEfficiency: 0, fulfilledRecommendations: 0 },
     session: { mode: null, hospitalId: null },
     simulation: { currentDate: nowIso(), demandMultiplier: 1, shipmentSpeed: 1 },

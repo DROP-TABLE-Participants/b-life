@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AppLoadingScreen } from "@/components/ui/AppLoadingScreen";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +22,7 @@ export default function LandingPage() {
 
   const router = useRouter();
   const hospitals = useAppStore((state) => state.hospitals);
+  const initialized = useAppStore((state) => state.initialized);
   const setSession = useAppStore((state) => state.setSession);
   const [selectedAccountId, setSelectedAccountId] = useState("national-center");
 
@@ -36,13 +38,9 @@ export default function LandingPage() {
     router.push("/control-tower");
   };
 
+  if (!initialized) return <AppLoadingScreen />;
+
   return (
-    <>
-      <style jsx global>{`
-        body {
-          background: var(--background) !important;
-        }
-      `}</style>
       <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-3 py-6 sm:px-4 sm:py-8">
         <video
           className="absolute inset-0 h-full w-full object-cover"
@@ -97,6 +95,5 @@ export default function LandingPage() {
           </CardContent>
         </Card>
       </main>
-    </>
   );
 }

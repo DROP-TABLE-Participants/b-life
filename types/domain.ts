@@ -58,6 +58,7 @@ export interface Hospital {
 
 export interface Shipment {
   id: string;
+  orderId?: string;
   recommendationId?: string;
   fromHospitalId: string;
   toHospitalId: string;
@@ -109,6 +110,24 @@ export interface ManualShipmentDraft {
   status: Exclude<ShipmentStatus, "delivered" | "cancelled">;
 }
 
+export type BloodOrderStatus = "pending" | "accepted" | "rejected" | "cancelled" | "fulfilled";
+
+export interface BloodOrderDraft {
+  requesterHospitalId: string;
+  supplierHospitalId: string;
+  bloodType: BloodType;
+  quantity: number;
+  priority: PriorityLevel;
+}
+
+export interface BloodOrder extends BloodOrderDraft {
+  id: string;
+  status: BloodOrderStatus;
+  shipmentId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SystemKPI {
   totalHospitals: number;
   activeShipments: number;
@@ -135,6 +154,7 @@ export interface AppState {
   lastUpdated: string;
   hospitals: Hospital[];
   shipments: Shipment[];
+  orders: BloodOrder[];
   forecasts: Forecast[];
   recommendations: TransferRecommendation[];
   kpis: SystemKPI;

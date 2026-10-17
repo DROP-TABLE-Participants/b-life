@@ -43,12 +43,27 @@ Choose a center or hospital from the account dropdown, or use the separate Minis
 The mock network has three facilities. The Burgas hospital belongs to the Stara Zagora regional center.
 All state lives in this browser's localStorage under `b-life:app-state`; there is no server database.
 Version 2 automatically replaces the previous demo data on first load. Reset controls are not exposed in the interface.
-The account switcher is a demo role selector, not production authentication, and separate browsers do not share state.
+The account switcher is a demo role selector, not production authentication. Tabs in the same browser share network data while keeping their own selected accounts; separate browsers do not share state.
 
 Plan a shipment to reserve units, then dispatch it from **Моите активни пратки**, or choose **Изпращане сега**.
 Only the sender can dispatch; only the recipient can mark an in-transit shipment received.
 Inventory is deducted on dispatch and credited once on receipt. Simulated arrival waits for receipt confirmation.
-The map uses the existing Mapbox integration.
+Each facility has separate **Наличности**, **Прогнози**, **Заявки**, **Пратки**, **Препоръки**, and **Карта** pages in the sidebar.
+The Ministry also has an **Общ преглед** page; all of its pages remain read-only.
+Account switching preserves the current section. Shared layouts keep the selected account, sidebar, storage synchronization, and shipment simulation active across navigation.
+
+The Mapbox map is restricted to Bulgaria, with foreign territory and labels masked outside its border.
+All three facilities have selectable markers that show inventory for all eight blood types.
+Only current shipments appear on the map, with selectable origin/destination routes and moving vehicle markers.
+Facility accounts see their own routes; the Ministry sees the entire network, using the same map without a heatmap.
+The country boundary is [Natural Earth 1:50m admin-0 data](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson), public domain, stored locally in `lib/geo/bulgaria.json`.
+
+To request blood, choose **Заявка за кръв**, a blood type, and a positive whole quantity.
+Only other facilities with enough unreserved stock appear as suppliers.
+The supplier sees the request under **Моите заявки за кръв** and may accept or decline; the requester may cancel a pending request.
+Acceptance rechecks stock and creates one approved shipment, reserving the quantity until dispatch.
+The normal dispatch and receipt flow completes the order. The Ministry can monitor orders without taking action.
+Existing saved accounts gain an empty order list without losing inventory or shipments.
 
 Validation: `npm test`, `npm run lint`, and `npm run build`.
 

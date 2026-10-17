@@ -7,12 +7,14 @@ const { useAppStore: store } = await import("@/store/useAppStore");
 const { forecastFacilities, sessionForFacility, visibleRecommendations } = await import("@/lib/access");
 const { STORAGE_KEY, APP_STATE_VERSION } = await import("@/lib/constants");
 const { runForecastingEngine } = await import("@/lib/forecasting");
+const { availableInventoryUnits, eligibleOrderSuppliers } = await import("@/lib/inventory");
 const state = () => store.getState();
 const stock = (id, type) => state().hospitals.find((item) => item.id === id).inventoryByBloodType[type];
 const login = (facility) => state().setSession(sessionForFacility(facility));
 const shipment = (id) => state().shipments.find((item) => item.id === id);
 const draft = (from, to, overrides = {}) => ({ fromHospitalId: from.id, toHospitalId: to.id, bloodType: "O-", quantity: 4, priority: "high", etaMinutes: 90, status: "planned", ...overrides });
-const data = () => JSON.stringify({ hospitals: state().hospitals, shipments: state().shipments, recommendations: state().recommendations });
+const data = () => JSON.stringify({ hospitals: state().hospitals, shipments: state().shipments, recommendations: state().recommendations, orders: state().orders });
+const orderDraft = (requester, supplier, overrides = {}) => ({ requesterHospitalId: requester.id, supplierHospitalId: supplier.id, bloodType: "O-", quantity: 4, priority: "high", ...overrides });
 
 beforeEach(() => {
   state().setSession({ mode: null, hospitalId: null });
@@ -160,4 +162,162 @@ test("old local data is replaced with the new mock network and reset preserves a
   state().resetDemoData();
   assert.deepEqual(state().session, sessionForFacility(regional));
   assert.equal(JSON.parse(storage.get(STORAGE_KEY)).version, APP_STATE_VERSION);
+});
+
+test("order suppliers are filtered by the selected type, quantity, and unreserved stock", () => {
+  const [national, regional, hospital] = state().hospitals;
+  // National B- stock is 75, with 14 already reserved for an approved shipment.
+  assert.equal(availableInventoryUnits(state(), national.id, "B-"), 61);
+  assert.deepEqual(eligibleOrderSuppliers(state(), hospital.id, "B-", 61).map((item) => item.id), [national.id]);
+  assert.deepEqual(eligibleOrderSuppliers(state(), hospital.id, "B-", 62), []);
+  assert.deepEqual(eligibleOrderSuppliers(state(), hospital.id, "B-", 18).map((item) => item.id), [national.id, regional.id]);
+  assert.deepEqual(eligibleOrderSuppliers(state(), hospital.id, "O+", 62).map((item) => item.id), [national.id, regional.id]);
+  assert.ok(!eligibleOrderSuppliers(state(), national.id, "O-", 1).some((item) => item.id === national.id));
+  for (const invalid of [0, -1, 0.5, NaN, Infinity]) assert.deepEqual(eligibleOrderSuppliers(state(), hospital.id, "O-", invalid), []);
+});
+
+test("an order awaits its supplier, reserves on acceptance, and fulfills through dispatch and receipt", () => {
+  const [national, supplier, requester] = state().hospitals;
+  login(requester);
+  const originalCount = state().shipments.length;
+  const supplierBefore = stock(supplier.id, "AB+");
+  const requesterBefore = stock(requester.id, "AB+");
+  assert.equal(state().placeBloodOrder(orderDraft(requester, supplier, { bloodType: "AB+", quantity: 8 })), true);
+  const order = state().orders[0];
+  assert.equal(order.status, "pending");
+  assert.equal(state().shipments.length, originalCount);
+  assert.equal(state().acceptBloodOrder(order.id), false);
+  assert.equal(state().rejectBloodOrder(order.id), false);
+  login(national);
+  assert.equal(state().acceptBloodOrder(order.id), false);
+  login(supplier);
+  assert.equal(state().acceptBloodOrder(order.id), true);
+  assert.equal(state().acceptBloodOrder(order.id), false);
+  const accepted = state().orders.find((item) => item.id === order.id);
+  assert.equal(accepted.status, "accepted");
+  assert.equal(state().shipments.filter((item) => item.orderId === order.id).length, 1);
+  assert.equal(shipment(accepted.shipmentId).status, "approved");
+  assert.equal(stock(supplier.id, "AB+"), supplierBefore);
+  assert.equal(availableInventoryUnits(state(), supplier.id, "AB+"), supplierBefore - 8);
+  login(requester);
+  assert.equal(state().cancelBloodOrder(order.id), false);
+  state().markShipmentReceived(accepted.shipmentId);
+  assert.equal(stock(requester.id, "AB+"), requesterBefore);
+  login(supplier);
+  state().dispatchShipment(accepted.shipmentId);
+  state().dispatchShipment(accepted.shipmentId);
+  assert.equal(stock(supplier.id, "AB+"), supplierBefore - 8);
+  login(requester);
+  state().markShipmentReceived(accepted.shipmentId);
+  state().markShipmentReceived(accepted.shipmentId);
+  assert.equal(stock(requester.id, "AB+"), requesterBefore + 8);
+  assert.equal(state().orders.find((item) => item.id === order.id).status, "fulfilled");
+});
+
+test("competing pending orders cannot reserve the same stock or bypass manual shipment reservations", () => {
+  const [national, supplier, hospital] = state().hospitals;
+  login(national);
+  assert.equal(state().placeBloodOrder(orderDraft(national, supplier, { bloodType: "AB+", quantity: 40 })), true);
+  const first = state().orders[0];
+  login(hospital);
+  assert.equal(state().placeBloodOrder(orderDraft(hospital, supplier, { bloodType: "AB+", quantity: 40 })), true);
+  const second = state().orders[0];
+  login(supplier);
+  assert.equal(state().acceptBloodOrder(first.id), true);
+  const before = data();
+  assert.equal(state().acceptBloodOrder(second.id), false);
+  assert.equal(state().scheduleManualShipment(draft(supplier, hospital, { bloodType: "AB+", quantity: 1 })), false);
+  assert.equal(data(), before);
+  login(hospital);
+  assert.equal(state().placeBloodOrder(orderDraft(hospital, supplier, { bloodType: "AB+", quantity: 1 })), false);
+});
+
+test("pending orders may be declined by the supplier or cancelled by the requester", () => {
+  const [, supplier, requester] = state().hospitals;
+  login(requester);
+  state().placeBloodOrder(orderDraft(requester, supplier));
+  const first = state().orders[0];
+  login(supplier);
+  assert.equal(state().cancelBloodOrder(first.id), false);
+  assert.equal(state().rejectBloodOrder(first.id), true);
+  assert.equal(state().acceptBloodOrder(first.id), false);
+  assert.equal(state().orders[0].status, "rejected");
+  login(requester);
+  state().placeBloodOrder(orderDraft(requester, supplier));
+  const second = state().orders[0];
+  assert.equal(state().cancelBloodOrder(second.id), true);
+  login(supplier);
+  assert.equal(state().acceptBloodOrder(second.id), false);
+  assert.equal(state().orders[0].status, "cancelled");
+});
+
+test("cancelling an accepted order's shipment releases its reservation and closes the order", () => {
+  const [, supplier, requester] = state().hospitals;
+  login(requester);
+  state().placeBloodOrder(orderDraft(requester, supplier));
+  const orderId = state().orders[0].id;
+  login(supplier);
+  const before = availableInventoryUnits(state(), supplier.id, "O-");
+  state().acceptBloodOrder(orderId);
+  const accepted = state().orders.find((item) => item.id === orderId);
+  assert.equal(availableInventoryUnits(state(), supplier.id, "O-"), before - accepted.quantity);
+  state().markShipmentStatus(accepted.shipmentId, "cancelled");
+  assert.equal(availableInventoryUnits(state(), supplier.id, "O-"), before);
+  assert.equal(state().orders.find((item) => item.id === orderId).status, "cancelled");
+});
+
+test("order validation and ministry permissions cannot be bypassed through store actions", () => {
+  const [national, supplier, requester] = state().hospitals;
+  login(requester);
+  for (const overrides of [{ quantity: 0 }, { quantity: -1 }, { quantity: 0.1 }, { quantity: NaN }, { quantity: Infinity }, { quantity: 9999 }, { bloodType: "X" }, { priority: "X" }, { supplierHospitalId: requester.id }, { supplierHospitalId: "missing" }, { requesterHospitalId: national.id }]) {
+    assert.equal(state().placeBloodOrder(orderDraft(requester, supplier, overrides)), false);
+  }
+  state().placeBloodOrder(orderDraft(requester, supplier));
+  const orderId = state().orders[0].id;
+  state().setSession({ mode: "control_tower", hospitalId: null });
+  const before = data();
+  assert.equal(state().placeBloodOrder(orderDraft(requester, supplier)), false);
+  assert.equal(state().acceptBloodOrder(orderId), false);
+  assert.equal(state().rejectBloodOrder(orderId), false);
+  assert.equal(state().cancelBloodOrder(orderId), false);
+  assert.equal(data(), before);
+});
+
+test("saved data gains orders without losing inventory, and accepted orders survive reload", () => {
+  const [, supplier, requester] = state().hospitals;
+  login(requester);
+  state().updateHospitalInventory(requester.id, "O-", 17);
+  const legacy = { ...state() };
+  delete legacy.orders;
+  storage.set(STORAGE_KEY, JSON.stringify(legacy));
+  store.setState({ initialized: false });
+  state().initialize();
+  assert.deepEqual(state().orders, []);
+  assert.equal(stock(requester.id, "O-"), 17);
+  assert.deepEqual(state().session, sessionForFacility(requester));
+  state().placeBloodOrder(orderDraft(requester, supplier));
+  const id = state().orders[0].id;
+  login(supplier);
+  state().acceptBloodOrder(id);
+  const accepted = state().orders[0];
+  store.setState({ initialized: false });
+  state().initialize();
+  assert.deepEqual(state().orders[0], accepted);
+  assert.equal(shipment(accepted.shipmentId).orderId, id);
+});
+
+test("tab synchronization refreshes orders without switching the local account or rewriting shared storage", () => {
+  const [, supplier, requester] = state().hospitals;
+  login(requester);
+  state().placeBloodOrder(orderDraft(requester, supplier));
+  const id = state().orders[0].id;
+  const shared = storage.get(STORAGE_KEY);
+  login(supplier);
+  store.setState({ orders: [] });
+  storage.set(STORAGE_KEY, shared);
+  state().syncFromStorage();
+  assert.equal(state().orders[0].id, id);
+  assert.deepEqual(state().session, sessionForFacility(supplier));
+  assert.equal(storage.get(STORAGE_KEY), shared);
+  assert.equal(state().acceptBloodOrder(id), true);
 });
