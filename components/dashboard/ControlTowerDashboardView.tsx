@@ -40,7 +40,7 @@ export function ControlTowerDashboardView({ section, hospitals, forecasts, shipm
       </Card>
     </>}
     {section === "inventory" && <InventoryPanel hospitals={hospitals} forecasts={forecasts} shipments={shipments} recommendations={recommendations} />}
-    {section === "forecast" && <ForecastPanel hospitals={hospitals} forecasts={forecasts} />}
+    {section === "forecast" && <ForecastPanel hospitals={hospitals} forecasts={forecasts} shipments={shipments} workspaceBase="/control-tower" />}
     {section === "orders" && <BloodOrdersPanel hospitals={hospitals} shipments={shipments} orders={orders} />}
     {section === "shipments" && <ShipmentsPanel hospitals={hospitals} shipments={shipments} />}
     {section === "recommendations" && <RecommendationsPanel hospitals={hospitals} recommendations={recommendations} />}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { availableInventoryUnits, eligibleOrderSuppliers } from "@/lib/inventory";
@@ -17,8 +18,11 @@ interface BloodOrderComposerProps {
 const selectClassName = "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 
 export function BloodOrderComposer({ hospital, hospitals, shipments, onOrder }: BloodOrderComposerProps) {
-  const [bloodType, setBloodType] = useState<BloodType>("O-");
-  const [quantity, setQuantity] = useState(4);
+  const searchParams = useSearchParams();
+  const presetType = searchParams.get("bloodType") as BloodType | null;
+  const presetQuantity = Number(searchParams.get("quantity"));
+  const [bloodType, setBloodType] = useState<BloodType>(presetType && BLOOD_TYPES.includes(presetType) ? presetType : "O-");
+  const [quantity, setQuantity] = useState(Number.isSafeInteger(presetQuantity) && presetQuantity > 0 ? presetQuantity : 4);
   const [priority, setPriority] = useState<PriorityLevel>("high");
   const [supplierId, setSupplierId] = useState("");
   const [message, setMessage] = useState("");

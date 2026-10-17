@@ -1,0 +1,96 @@
+.workspace { display: flex; flex-direction: column; gap: 20px; color: #17202f; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 20px; justify-content: space-between; }
+.facilitySelect { display: grid; flex: 1; min-width: 0; gap: 8px; font-size: 12px; font-weight: 600; color: #64748b; }
+.facilitySelect select { width: 100%; min-width: 0; height: 44px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: 0 12px; font-size: 13px; font-weight: 500; color: #17202f; text-overflow: ellipsis; }
+.horizonControl { display: grid; gap: 8px; font-size: 12px; font-weight: 600; color: #64748b; }
+.segmented { display: flex; width: fit-content; padding: 4px; gap: 4px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+.segmented button { padding: 8px 15px; border: 0; border-radius: 8px; background: transparent; font-size: 12px; font-weight: 600; color: #64748b; cursor: pointer; white-space: nowrap; transition: background 150ms, color 150ms; }
+.segmented button[aria-pressed="true"] { background: #17202f; color: #fff; box-shadow: 0 2px 4px #0f172a0d; }
+.workspace button:focus-visible, .workspace a:focus-visible, .facilitySelect select:focus-visible { outline: 2px solid #e85a39; outline-offset: 3px; }
+.helpTrigger { position: fixed; right: max(24px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); z-index: 40; display: grid; place-items: center; width: 56px; height: 56px; padding: 0; border: 1px solid #e85a39; border-radius: 50%; background: #e85a39; color: #fff; box-shadow: 0 5px 18px #e85a3933; cursor: pointer; transition: background 150ms, box-shadow 150ms; }
+.helpTrigger:hover { background: #d84c2d; box-shadow: 0 7px 22px #e85a3940; }
+.helpTrigger:focus-visible { outline: 2px solid #17202f; outline-offset: 4px; }
+.outlook { border: 1px solid #dcebe5; border-radius: 22px; padding: 22px; background: linear-gradient(115deg, #f4faf7 5%, #fff 70%); }
+.outlookWarning { border-color: #f5ddd3; background: linear-gradient(115deg, #fff6ef 5%, #fff 70%); }
+.outlook h2 { margin: 0 0 8px; font-size: 18px; font-weight: 600; line-height: 1.5; }
+.outlook p { margin: 0; font-size: 13px; line-height: 1.8; color: #64748b; }
+.outlook strong { color: #17202f; font-weight: 600; }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.metric { min-width: 0; padding: 18px; border: 1px solid #e5e9ef; border-radius: 16px; background: #fff; }
+.metricLabel { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #64748b; font-size: 12px; }
+.metricValue { display: flex; align-items: baseline; gap: 6px; margin: 12px 0 6px; font-size: 32px; font-weight: 650; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.metricValue span { font-size: 12px; font-weight: 500; letter-spacing: 0; color: #64748b; }
+.metricDetail { margin: 0; font-size: 11px; line-height: 1.6; color: #64748b; }
+.metricAttention { border-color: #f5ddd3; background: #fffaf6; }
+.metricAttention .metricValue { color: #cf4829; }
+.scenario { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border: 1px solid #e5e9ef; border-radius: 16px; background: #fafbfc; }
+.scenario h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.scenario p { margin: 4px 0 0; font-size: 11px; color: #64748b; }
+.scenario .segmented { background: #fff; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.sectionHeading h2, .panel h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+.sectionHeading p { margin: 5px 0 0; color: #64748b; font-size: 12px; }
+.smallLabel { flex-shrink: 0; color: #64748b; font-size: 11px; }
+.bloodGroups { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.bloodCard { min-width: 0; text-align: left; padding: 16px; border: 1px solid #e5e9ef; border-radius: 15px; background: #fff; cursor: pointer; transition: border-color 150ms, box-shadow 150ms; }
+.bloodCard:hover { border-color: #e8b7a8; }
+.bloodCardSelected { border-color: #e85a39; box-shadow: 0 0 0 2px #e85a3910; background: #fffaf7; }
+.bloodCardTop { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.bloodCardTop > strong { font-size: 21px; font-weight: 650; letter-spacing: -.04em; }
+.groupStatus { display: inline-flex; align-items: center; gap: 3px; padding: 3px 5px; border-radius: 5px; background: #ecfdf5; color: #047857; font-size: 11px; font-weight: 600; }
+.groupStatusWarning { color: #c34827; background: #ffeddc; }
+.bloodCard > p { margin: 12px 0 8px; font-size: 11px; color: #64748b; }
+.bloodCard > p strong { color: #334155; font-weight: 600; }
+.coverageTrack { height: 4px; overflow: hidden; border-radius: 20px; background: #f1f5f9; }
+.coverageTrack span { display: block; height: 100%; border-radius: inherit; transition: width 200ms; }
+.bloodCardNote { display: block; margin-top: 9px; color: #64748b; font-size: 11px; }
+.mainGrid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(240px, 1fr); gap: 16px; align-items: start; }
+.panel { min-width: 0; border: 1px solid #e5e9ef; border-radius: 20px; background: #fff; padding: 22px; }
+.chartHeading { display: flex; align-items: center; gap: 12px; }
+.bloodType { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border: 1px solid #f5ddd3; border-radius: 13px; background: #fff6ef; color: #d64c2e; font-size: 20px; font-weight: 650; letter-spacing: -.04em; }
+.chartHeading p { margin: 5px 0 0; font-size: 11px; color: #64748b; line-height: 1.5; }
+.chart { min-width: 0; width: 100%; height: 240px; margin-top: 14px; }
+.chartLegend { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 10px 0; font-size: 11px; color: #64748b; }
+.chartLegend span { display: inline-flex; align-items: center; gap: 6px; }
+.chartLegend i { width: 14px; height: 3px; border-radius: 4px; }
+.chartNote { margin: 0 0 18px; text-align: center; color: #64748b; font-size: 11px; line-height: 1.6; }
+.chartStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 16px; border-top: 1px solid #f1f5f9; }
+.chartStats div { display: flex; flex-direction: column; gap: 6px; }
+.chartStats span { color: #64748b; font-size: 11px; }
+.chartStats strong { font-size: 13px; font-weight: 600; }
+.chartStats small { font-size: 11px; color: #64748b; }
+.warningText { color: #cf4829; }
+.deliveryNote { padding: 10px 12px; margin: 16px 0 0; border-radius: 8px; background: #fffbeb; color: #a16207; font-size: 11px; line-height: 1.6; }
+.muted { color: #64748b; font-size: 11px; line-height: 1.8; margin: 10px 0 0; }
+.actionList { margin: 12px 0 0; }
+.actionRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+.groupLink { padding: 0; border: 0; background: transparent; color: #17202f; font-size: 14px; font-weight: 700; cursor: pointer; }
+.groupLink:hover { color: #e85a39; }
+.actionRow p { display: flex; align-items: center; gap: 4px; margin: 3px 0 0; font-size: 11px; color: #64748b; }
+.actionQuantity { display: grid; justify-items: end; gap: 4px; }
+.actionQuantity strong { font-size: 13px; font-weight: 600; color: #cf4829; }
+.actionQuantity a { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #64748b; }
+.actionQuantity a:hover { color: #e85a39; }
+.actionButton { display: flex; align-items: center; justify-content: center; margin-top: 16px; padding: 12px; border-radius: 10px; background: #17202f; color: #fff; text-decoration: none; font-size: 12px; font-weight: 600; }
+.actionButton:hover { background: #334155; }
+.footnote { margin: 12px 0 0; color: #64748b; font-size: 11px; line-height: 1.7; }
+@media (min-width: 1600px) { .bloodGroups { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+@media (max-width: 1150px) { .mainGrid { grid-template-columns: minmax(0, 1fr); } .metric { padding: 14px; } .metricLabel { align-items: start; line-height: 1.5; } }
+@media (max-width: 640px) {
+  .helpTrigger { right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 52px; height: 52px; }
+  .workspace { gap: 16px; }
+  .toolbar { gap: 14px; }
+  .facilitySelect { flex-basis: 100%; }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .metricValue { font-size: 28px; }
+  .bloodGroups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scenario { padding: 16px; }
+  .scenario .segmented { width: 100%; }
+  .scenario .segmented button { flex: 1; }
+  .panel { padding: 18px; }
+  .chartStats { gap: 10px; }
+  .chartStats strong { font-size: 12px; }
+  .chartHeading h2 { font-size: 14px; }
+  .smallLabel { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .workspace *, .helpTrigger { transition: none; } }

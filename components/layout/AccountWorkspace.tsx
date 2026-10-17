@@ -4,6 +4,7 @@ import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { MainView } from "@/components/layout/MainView";
+import { ForecastHelpSheet } from "@/components/dashboard/ForecastHelpSheet";
 import { AppLoadingScreen } from "@/components/ui/AppLoadingScreen";
 import { useInitializeAppState } from "@/hooks/useInitializeAppState";
 import { FACILITY_ROLE_LABELS, sessionForFacility } from "@/lib/access";
@@ -53,6 +54,7 @@ export function AccountWorkspace({ admin = false, children }: { admin?: boolean;
       }}>
         {children}
       </MainView>
+      {activeSection === "forecast" && <ForecastHelpSheet />}
     </Suspense>
   );
 }

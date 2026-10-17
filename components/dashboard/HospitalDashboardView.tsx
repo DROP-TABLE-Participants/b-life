@@ -48,7 +48,7 @@ export function HospitalDashboardView({ section, hospital, hospitals, shipments,
       {pending > 0 && section !== "orders" && <Link href={`/hospital/${hospital.id}/orders#blood-orders`} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">Заявки към Вас ({pending})</Link>}
     </header>
     {section === "inventory" && <InventoryPanel hospitals={hospitals} facilities={[hospital]} forecasts={forecasts} shipments={shipments} recommendations={myRecommendations} />}
-    {section === "forecast" && <ForecastPanel hospitals={scopedFacilities} forecasts={forecasts} />}
+    {section === "forecast" && <ForecastPanel hospitals={scopedFacilities} forecasts={forecasts} shipments={shipments} workspaceBase={`/hospital/${hospital.id}`} operatingFacilityId={hospital.id} />}
     {section === "recommendations" && <RecommendationsPanel hospitals={hospitals} recommendations={myRecommendations} facility={hospital} onApprove={onApproveRecommendation} onDispatch={onDispatchRecommendation} />}
     {section === "orders" && <>
       <Card className={cn(surfaceStyles.dashboardCardSurface, "overflow-hidden")}>
