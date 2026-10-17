@@ -11,7 +11,7 @@ export function FacilityDashboardPage({ section }: { section: WorkspaceSection }
   const facility = state.hospitals.find((item) => item.id === hospitalId);
   if (!state.initialized || !facility) return null;
   return <HospitalDashboardView key={`${facility.id}:${section}`} section={section}
-    hospital={facility} hospitals={state.hospitals} shipments={state.shipments} forecasts={state.forecasts} orders={state.orders}
+    hospital={facility} hospitals={state.hospitals} session={state.session} shipments={state.shipments} forecasts={state.forecasts} orders={state.orders}
     recommendations={state.recommendations}
     onApproveRecommendation={state.approveRecommendation} onDispatchRecommendation={state.dispatchRecommendation}
     onDispatchShipment={state.dispatchShipment} onReceiveShipment={state.markShipmentReceived}

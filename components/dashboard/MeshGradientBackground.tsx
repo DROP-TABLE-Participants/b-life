@@ -1,206 +1,212 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./MeshGradientBackground.module.css";
 
 interface MeshGradientBackgroundProps {
   seed: string;
-  colorA: string;
-  colorB: string;
-  colorC: string;
-  accent: string;
+  /** Three aura colours as hex, strongest first. */
+  colors: [string, string, string];
+  /** 0–1. Higher risk renders a stronger aura. */
+  intensity: number;
 }
 
-interface MeshShapeLayout {
-  top: string;
-  left: string;
-  width: string;
-  height: string;
-  radius: string;
+const VERTEX_SHADER = `
+attribute vec2 aPosition;
+void main() { gl_Position = vec4(aPosition, 0.0, 1.0); }
+`;
+
+// Three gaussian auras anchored to the top of the card, a soft highlight, and a
+// frost fade so the gradient never sits behind the numbers.
+const FRAGMENT_SHADER = `
+precision mediump float;
+uniform vec2 uResolution;
+uniform float uTime;
+uniform vec2 uPointer;
+uniform vec3 uColorA;
+uniform vec3 uColorB;
+uniform vec3 uColorC;
+uniform float uIntensity;
+uniform float uSeed;
+
+float aura(vec2 point, vec2 center, float radius) {
+  vec2 delta = point - center;
+  return exp(-dot(delta, delta) / (radius * radius));
 }
 
-interface MeshLayout {
-  primary: MeshShapeLayout;
-  secondary: MeshShapeLayout;
-  tertiary: MeshShapeLayout;
-  glow: MeshShapeLayout;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uResolution;
+  uv.y = 1.0 - uv.y;
+  float aspect = uResolution.x / uResolution.y;
+  vec2 point = vec2(uv.x * aspect, uv.y);
+  vec2 pull = (uPointer - 0.5) * vec2(0.22 * aspect, 0.16);
+  float t = uTime * 0.22;
+
+  vec2 centerA = vec2((0.70 + 0.06 * sin(t + uSeed)) * aspect, -0.06 + 0.05 * cos(t * 0.8 + uSeed)) + pull;
+  vec2 centerB = vec2((0.22 + 0.07 * cos(t * 0.9 + uSeed * 1.7)) * aspect, -0.10 + 0.06 * sin(t * 1.1 + uSeed)) - pull * 0.7;
+  vec2 centerC = vec2((0.86 + 0.05 * sin(t * 1.2 + uSeed * 0.5)) * aspect, 0.16 + 0.05 * cos(t + uSeed * 0.3)) + pull * 0.5;
+
+  float a = aura(point, centerA, 0.42 * aspect);
+  float b = aura(point, centerB, 0.36 * aspect);
+  float c = aura(point, centerC, 0.30 * aspect);
+  float highlight = aura(point, centerA + vec2(-0.06 * aspect, 0.05), 0.16 * aspect);
+
+  float weight = a + b + c + 0.0001;
+  vec3 color = (uColorA * a + uColorB * b + uColorC * c) / weight;
+  color = mix(color, vec3(1.0), highlight * 0.5);
+
+  float alpha = clamp(max(a, max(b, c)) * 1.2, 0.0, 1.0);
+  alpha *= 1.0 - smoothstep(0.18, 0.78, uv.y);
+  alpha *= uIntensity;
+  gl_FragColor = vec4(color * alpha, alpha);
 }
+`;
 
-const hashSeed = (seed: string) =>
-  seed.split("").reduce((accumulator, character, index) => {
-    return (accumulator * 31 + character.charCodeAt(0) + index) >>> 0;
-  }, 2166136261);
-
-const createSeededRandom = (seed: string) => {
-  let value = hashSeed(seed) || 1;
-
-  return () => {
-    value = (value * 1664525 + 1013904223) >>> 0;
-    return value / 4294967295;
-  };
+const hexToRgb = (hex: string): [number, number, number] => {
+  const value = Number.parseInt(hex.replace("#", ""), 16);
+  return [(value >> 16 & 255) / 255, (value >> 8 & 255) / 255, (value & 255) / 255];
 };
 
-const toPercent = (value: number) => `${value.toFixed(2)}%`;
+const seedToFloat = (seed: string) =>
+  (seed.split("").reduce((sum, character) => (sum * 31 + character.charCodeAt(0)) >>> 0, 7) % 1000) / 100;
 
-const createRadius = (random: () => number) =>
-  `${toPercent(38 + random() * 20)} ${toPercent(42 + random() * 18)} ${toPercent(40 + random() * 22)} ${toPercent(36 + random() * 20)}`;
-
-const createLayout = (seed: string): MeshLayout => {
-  const random = createSeededRandom(seed);
-
-  return {
-    primary: {
-      top: toPercent(-24 + random() * 14),
-      left: toPercent(-20 + random() * 18),
-      width: toPercent(64 + random() * 18),
-      height: toPercent(60 + random() * 18),
-      radius: createRadius(random),
-    },
-    secondary: {
-      top: toPercent(-2 + random() * 18),
-      left: toPercent(2 + random() * 24),
-      width: toPercent(56 + random() * 24),
-      height: toPercent(54 + random() * 20),
-      radius: createRadius(random),
-    },
-    tertiary: {
-      top: toPercent(2 + random() * 18),
-      left: toPercent(-8 + random() * 18),
-      width: toPercent(48 + random() * 18),
-      height: toPercent(46 + random() * 16),
-      radius: createRadius(random),
-    },
-    glow: {
-      top: toPercent(-6 + random() * 12),
-      left: toPercent(0 + random() * 18),
-      width: toPercent(40 + random() * 22),
-      height: toPercent(38 + random() * 18),
-      radius: "999px",
-    },
-  };
+const compile = (gl: WebGLRenderingContext, type: number, source: string) => {
+  const shader = gl.createShader(type);
+  if (!shader) return null;
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? shader : null;
 };
 
-export function MeshGradientBackground({
-  seed,
-  colorA,
-  colorB,
-  colorC,
-  accent,
-}: MeshGradientBackgroundProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const pointerX = useMotionValue(0.5);
-  const pointerY = useMotionValue(0.5);
-
-  const springX = useSpring(pointerX, { stiffness: 90, damping: 18, mass: 0.4 });
-  const springY = useSpring(pointerY, { stiffness: 90, damping: 18, mass: 0.4 });
-
-  const blobOffsetX = useTransform(springX, [0, 1], [-34, 34]);
-  const blobOffsetY = useTransform(springY, [0, 1], [-26, 26]);
-  const glowOffsetX = useTransform(springX, [0, 1], [-42, 42]);
-  const glowOffsetY = useTransform(springY, [0, 1], [-34, 34]);
-  const blobSecondaryOffsetX = useTransform(blobOffsetX, (value) => value * -0.7);
-  const blobSecondaryOffsetY = useTransform(blobOffsetY, (value) => value * 0.8);
-  const blobTertiaryOffsetX = useTransform(blobOffsetX, (value) => value * 0.5);
-  const blobTertiaryOffsetY = useTransform(blobOffsetY, (value) => value * -0.65);
-  const layout = useMemo(() => createLayout(seed), [seed]);
+export function MeshGradientBackground({ seed, colors, intensity }: MeshGradientBackgroundProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [fallback, setFallback] = useState(false);
+  const colorKey = colors.join(",");
 
   useEffect(() => {
-    const hostElement = containerRef.current?.parentElement;
-    if (!hostElement) return;
+    const canvas = canvasRef.current;
+    const host = canvas?.parentElement;
+    const gl = canvas?.getContext("webgl", { premultipliedAlpha: true, antialias: false });
+    if (!canvas || !host || !gl) {
+      setFallback(true);
+      return;
+    }
 
-    const handlePointerMove = (event: PointerEvent) => {
-      const bounds = hostElement.getBoundingClientRect();
-      const nextX = (event.clientX - bounds.left) / bounds.width;
-      const nextY = (event.clientY - bounds.top) / bounds.height;
+    const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
+    const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+    const program = gl.createProgram();
+    if (!vertex || !fragment || !program) {
+      setFallback(true);
+      return;
+    }
+    gl.attachShader(program, vertex);
+    gl.attachShader(program, fragment);
+    gl.linkProgram(program);
+    gl.useProgram(program);
 
-      pointerX.set(Math.min(1, Math.max(0, nextX)));
-      pointerY.set(Math.min(1, Math.max(0, nextY)));
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(program, "aPosition");
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+    const uniform = (name: string) => gl.getUniformLocation(program, name);
+    const [colorA, colorB, colorC] = colorKey.split(",").map(hexToRgb);
+    gl.uniform3fv(uniform("uColorA"), colorA);
+    gl.uniform3fv(uniform("uColorB"), colorB);
+    gl.uniform3fv(uniform("uColorC"), colorC);
+    gl.uniform1f(uniform("uIntensity"), intensity);
+    gl.uniform1f(uniform("uSeed"), seedToFloat(seed));
+    const resolutionLocation = uniform("uResolution");
+    const timeLocation = uniform("uTime");
+    const pointerLocation = uniform("uPointer");
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const target = { x: 0.5, y: 0.5 };
+    const pointer = { x: 0.5, y: 0.5 };
+    let frame = 0;
+    let visible = true;
+    const startedAt = performance.now();
+
+    const resize = () => {
+      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+      canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
     };
 
-    const handlePointerLeave = () => {
-      pointerX.set(0.5);
-      pointerY.set(0.5);
+    const draw = () => {
+      pointer.x += (target.x - pointer.x) * 0.08;
+      pointer.y += (target.y - pointer.y) * 0.08;
+      gl.uniform1f(timeLocation, reducedMotion ? 0 : (performance.now() - startedAt) / 1000);
+      gl.uniform2f(pointerLocation, pointer.x, pointer.y);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
 
-    hostElement.addEventListener("pointermove", handlePointerMove);
-    hostElement.addEventListener("pointerleave", handlePointerLeave);
+    const loop = () => {
+      draw();
+      frame = visible && !reducedMotion && !document.hidden ? requestAnimationFrame(loop) : 0;
+    };
+    const start = () => {
+      if (!frame) frame = requestAnimationFrame(loop);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      const bounds = host.getBoundingClientRect();
+      target.x = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
+      target.y = Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height));
+      if (reducedMotion) draw();
+    };
+    const onPointerLeave = () => {
+      target.x = 0.5;
+      target.y = 0.5;
+    };
+
+    const resizeObserver = new ResizeObserver(() => {
+      resize();
+      draw();
+    });
+    const visibilityObserver = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) start();
+    });
+    const onVisibilityChange = () => {
+      if (!document.hidden) start();
+    };
+
+    resize();
+    draw();
+    resizeObserver.observe(canvas);
+    visibilityObserver.observe(canvas);
+    host.addEventListener("pointermove", onPointerMove);
+    host.addEventListener("pointerleave", onPointerLeave);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    start();
 
     return () => {
-      hostElement.removeEventListener("pointermove", handlePointerMove);
-      hostElement.removeEventListener("pointerleave", handlePointerLeave);
+      cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      visibilityObserver.disconnect();
+      host.removeEventListener("pointermove", onPointerMove);
+      host.removeEventListener("pointerleave", onPointerLeave);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      gl.deleteProgram(program);
+      gl.deleteShader(vertex);
+      gl.deleteShader(fragment);
+      gl.deleteBuffer(buffer);
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
-  }, [pointerX, pointerY]);
+  }, [seed, colorKey, intensity]);
 
-  const style = {
-    "--mesh-color-a": colorA,
-    "--mesh-color-b": colorB,
-    "--mesh-color-c": colorC,
-    "--mesh-accent": accent,
-  } as CSSProperties;
+  if (fallback) {
+    return <div aria-hidden="true" className={styles.meshFallback} style={{
+      opacity: intensity,
+      background: `radial-gradient(60% 90% at 72% 0%, ${colors[0]} 0%, transparent 70%), radial-gradient(50% 80% at 20% 0%, ${colors[1]} 0%, transparent 70%)`,
+    }} />;
+  }
 
-  return (
-    <div
-      ref={containerRef}
-      className={styles.meshBackground}
-      style={style}
-      aria-hidden="true"
-    >
-      <motion.div
-        className={`${styles.meshBlob} ${styles.meshBlobPrimary}`}
-        animate={{ scale: [1, 1.14, 0.96, 1], rotate: [0, 12, -7, 0] }}
-        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-        style={{
-          top: layout.primary.top,
-          left: layout.primary.left,
-          width: layout.primary.width,
-          height: layout.primary.height,
-          borderRadius: layout.primary.radius,
-          x: blobOffsetX,
-          y: blobOffsetY,
-        }}
-      />
-      <motion.div
-        className={`${styles.meshBlob} ${styles.meshBlobSecondary}`}
-        animate={{ scale: [1, 0.92, 1.08, 1], rotate: [0, -14, 9, 0] }}
-        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-        style={{
-          top: layout.secondary.top,
-          left: layout.secondary.left,
-          width: layout.secondary.width,
-          height: layout.secondary.height,
-          borderRadius: layout.secondary.radius,
-          x: blobSecondaryOffsetX,
-          y: blobSecondaryOffsetY,
-        }}
-      />
-      <motion.div
-        className={`${styles.meshBlob} ${styles.meshBlobTertiary}`}
-        animate={{ scale: [1, 1.12, 0.9, 1], rotate: [0, 18, -11, 0] }}
-        transition={{ duration: 17, repeat: Infinity, ease: "easeInOut" }}
-        style={{
-          top: layout.tertiary.top,
-          left: layout.tertiary.left,
-          width: layout.tertiary.width,
-          height: layout.tertiary.height,
-          borderRadius: layout.tertiary.radius,
-          x: blobTertiaryOffsetX,
-          y: blobTertiaryOffsetY,
-        }}
-      />
-      <motion.div
-        className={styles.meshGlow}
-        style={{
-          top: layout.glow.top,
-          left: layout.glow.left,
-          width: layout.glow.width,
-          height: layout.glow.height,
-          borderRadius: layout.glow.radius,
-          x: glowOffsetX,
-          y: glowOffsetY,
-        }}
-      />
-    </div>
-  );
+  // A fresh canvas per configuration: the previous context is released on cleanup.
+  return <canvas key={`${seed}:${colorKey}:${intensity}`} ref={canvasRef} aria-hidden="true" className={styles.meshCanvas} />;
 }

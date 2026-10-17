@@ -1,28 +1,41 @@
 .inventoryGrid {
   display: grid;
   width: 100%;
-  height: auto;
-  min-height: 0;
-  gap: 12px;
+  gap: 16px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: minmax(140px, auto);
 }
 
 .inventoryCard {
-  --dashboard-card-background: rgba(255, 255, 255, 0.32);
-  --dashboard-card-border: rgba(226, 232, 240, 0.65);
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
   min-width: 0;
+  min-height: 140px;
   overflow: hidden;
-  cursor: pointer;
-  transition: border-color 160ms ease;
+  border-color: var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass-surface);
+  isolation: isolate;
 }
 
-.inventoryCard:hover {
-  --dashboard-card-border: rgba(148, 163, 184, 0.95);
+.inventoryCard::after {
+  position: absolute;
+  top: 0;
+  right: 12px;
+  left: 12px;
+  height: 1px;
+  background: rgb(255 255 255 / 0.9);
+  content: "";
+}
+
+.inventoryCardInteractive {
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.inventoryCardInteractive:hover {
+  border-color: rgb(148 163 184 / 0.6);
+  box-shadow: var(--shadow-popover);
 }
 
 .inventoryCardContent {
@@ -32,69 +45,63 @@
   flex: 1;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 0;
+  gap: 16px;
   padding: 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+
+.inventoryCardHeaderTopRow,
+.inventoryAmountRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .inventoryCardHeaderTopRow {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.inventoryCardGroup {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 700;
-  line-height: 1.75rem;
-  color: #0f172a;
-}
-
-.inventoryCardRisk {
-  margin-top: 0;
-  width: fit-content;
 }
 
 .inventoryAmountRow {
-  display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
+}
+
+.inventoryCardGroup {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 28px;
+  color: var(--ink);
 }
 
 .inventoryAmountValueGroup {
   display: flex;
   align-items: baseline;
-  gap: 4px;
-  min-width: 0;
+  gap: 6px;
 }
 
 .inventoryAmountValue {
-  font-size: 2rem;
+  font-size: 32px;
   font-weight: 700;
-  line-height: 2.5rem;
-  color: #0f172a;
+  line-height: 40px;
+  letter-spacing: -0.5px;
+  color: var(--ink);
 }
 
-.inventoryAmountDivider {
-  font-size: 1.25rem;
+.inventoryAmountNeed {
+  font-size: 18px;
   font-weight: 600;
-  line-height: 1.75rem;
-  color: #94a3b8;
+  line-height: 28px;
+  color: var(--ink-muted);
 }
 
-.inventoryAmountMax {
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.75rem;
-  color: #94a3b8;
+.inventoryAmountCaption {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-secondary);
 }
 
 .inventoryExpandButton {
   flex-shrink: 0;
-  color: #94a3b8;
+  color: var(--ink-muted);
 }
 
 @media (max-width: 1280px) {

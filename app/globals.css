@@ -46,6 +46,37 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted: var(--ink-muted);
+  --color-canvas: var(--canvas);
+  --color-hairline: var(--hairline);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-strong: var(--brand-strong);
+  --color-glass: var(--glass-surface);
+  --color-glass-strong: var(--glass-surface-strong);
+  --color-glass-subtle: var(--glass-surface-subtle);
+  --color-glass-border: var(--glass-border);
+  --color-safe: var(--status-safe-strong);
+  --color-safe-soft: var(--status-safe-soft);
+  --color-safe-border: var(--status-safe-border);
+  --color-elevated: var(--status-elevated-strong);
+  --color-elevated-soft: var(--status-elevated-soft);
+  --color-elevated-border: var(--status-elevated-border);
+  --color-high: var(--status-high-strong);
+  --color-high-soft: var(--status-high-soft);
+  --color-high-border: var(--status-high-border);
+  --color-critical: var(--status-critical-strong);
+  --color-critical-soft: var(--status-critical-soft);
+  --color-critical-border: var(--status-critical-border);
+  --color-facility-national: var(--facility-national);
+  --color-facility-regional: var(--facility-regional);
+  --color-facility-hospital: var(--facility-hospital);
+  --shadow-glass-panel: 0 18px 40px rgb(15 23 42 / 0.08);
+  --shadow-glass-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px rgb(15 23 42 / 0.04);
+  --shadow-popover: 0 12px 32px rgb(15 23 42 / 0.14);
+  --shadow-control: 0 1px 2px rgb(15 23 42 / 0.06);
 }
 
 * {
@@ -75,8 +106,8 @@ select {
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: #e85a39;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -101,6 +132,35 @@ select {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* B.Life design tokens (Figma: B.Life / Kit) */
+  --ink: #0f172a;
+  --ink-secondary: #475569;
+  --ink-muted: #94a3b8;
+  --canvas: #f8fafc;
+  --hairline: rgb(15 23 42 / 0.08);
+  --brand: #e85a39;
+  --brand-soft: #fdeee9;
+  --brand-strong: #c2410c;
+  --glass-surface: rgb(255 255 255 / 0.85);
+  --glass-surface-strong: rgb(255 255 255 / 0.88);
+  --glass-surface-subtle: rgb(255 255 255 / 0.45);
+  --glass-border: rgb(255 255 255 / 0.7);
+  --status-safe-strong: #047857;
+  --status-safe-soft: #ecfdf5;
+  --status-safe-border: #a7f3d0;
+  --status-elevated-strong: #b45309;
+  --status-elevated-soft: #fffbeb;
+  --status-elevated-border: #fde68a;
+  --status-high-strong: #c2410c;
+  --status-high-soft: #fff7ed;
+  --status-high-border: #fed7aa;
+  --status-critical-strong: #be123c;
+  --status-critical-soft: #fff1f2;
+  --status-critical-border: #fecdd3;
+  --facility-national: #e85a39;
+  --facility-regional: #2563eb;
+  --facility-hospital: #059669;
 }
 
 .dark {

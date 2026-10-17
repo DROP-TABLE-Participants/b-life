@@ -9,7 +9,7 @@ import { AppLoadingScreen } from "@/components/ui/AppLoadingScreen";
 import { useInitializeAppState } from "@/hooks/useInitializeAppState";
 import { FACILITY_ROLE_LABELS, sessionForFacility } from "@/lib/access";
 import { MINISTRY_NAME } from "@/lib/labels";
-import { workspaceHref, workspaceNavigation } from "@/lib/navigation";
+import { facilitySection, workspaceHref, workspaceNavigation } from "@/lib/navigation";
 import { useAppStore } from "@/store/useAppStore";
 
 export function AccountWorkspace({ admin = false, children }: { admin?: boolean; children: React.ReactNode }) {
@@ -38,7 +38,7 @@ export function AccountWorkspace({ admin = false, children }: { admin?: boolean;
 
   const base = admin ? "/control-tower" : `/hospital/${facility!.id}`;
   const navigation = workspaceNavigation(base);
-  const activeSection = navigation.find((item) => item.href === pathname)?.icon ?? (admin ? "overview" : "inventory");
+  const activeSection = navigation.find((item) => item.href === pathname)?.icon ?? "overview";
 
   return (
     <Suspense fallback={<AppLoadingScreen />}>
@@ -47,7 +47,7 @@ export function AccountWorkspace({ admin = false, children }: { admin?: boolean;
         role: admin ? "Администратор — преглед" : FACILITY_ROLE_LABELS[facility!.kind],
         details: [admin ? "Наблюдение на мрежата" : facility!.city],
         switchOptions: hospitals.map((item) => ({
-          label: item.name, href: workspaceHref(`/hospital/${item.id}`, activeSection === "overview" ? "inventory" : activeSection),
+          label: item.name, href: workspaceHref(`/hospital/${item.id}`, facilitySection(activeSection)),
           onSelect: () => setSession(sessionForFacility(item)),
         })),
         logoutHref: "/", onLogout: () => setSession({ mode: null, hospitalId: null }),

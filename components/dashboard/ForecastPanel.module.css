@@ -1,67 +1,34 @@
-.workspace { display: flex; flex-direction: column; gap: 20px; color: #17202f; }
-.toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 10.5rem; gap: 20px; }
-.facilitySelect { display: grid; min-width: 0; gap: 8px; font-size: 12px; font-weight: 600; color: #64748b; }
-.workspace button:focus-visible, .workspace a:focus-visible { outline: 2px solid #e85a39; outline-offset: 3px; }
-.helpTrigger { position: fixed; right: max(24px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom)); z-index: 40; display: grid; place-items: center; width: 56px; height: 56px; padding: 0; border: 1px solid #e85a39; border-radius: 50%; background: #e85a39; color: #fff; box-shadow: 0 5px 18px #e85a3933; cursor: pointer; transition: background 150ms, box-shadow 150ms; }
-.helpTrigger:hover { background: #d84c2d; box-shadow: 0 7px 22px #e85a3940; }
-.helpTrigger:focus-visible { outline: 2px solid #17202f; outline-offset: 4px; }
-.outlook { border: 1px solid #dcebe5; border-radius: 12px; padding: 22px; background: linear-gradient(115deg, #f4faf7 5%, #fff 70%); }
-.outlookWarning { border-color: #f5ddd3; background: linear-gradient(115deg, #fff6ef 5%, #fff 70%); }
-.outlook h2 { margin: 0 0 8px; font-size: 18px; font-weight: 600; line-height: 1.5; }
-.outlook p { margin: 0; font-size: 13px; line-height: 1.8; color: #64748b; }
-.outlook strong { color: #17202f; font-weight: 600; }
-.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.metric { min-width: 0; padding: 18px; border: 1px solid #e5e9ef; border-radius: 10px; background: #fff; }
-.metricLabel { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #64748b; font-size: 12px; }
-.metricValue { display: flex; align-items: baseline; gap: 6px; margin: 12px 0 6px; font-size: 32px; font-weight: 650; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
-.metricValue span { font-size: 12px; font-weight: 500; letter-spacing: 0; color: #64748b; }
-.metricDetail { margin: 0; font-size: 11px; line-height: 1.6; color: #64748b; }
-.metricAttention { border-color: #f5ddd3; background: #fffaf6; }
-.metricAttention .metricValue { color: #cf4829; }
-.sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.sectionHeading h2, .panel h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
-.sectionHeading p { margin: 5px 0 0; color: #64748b; font-size: 12px; }
-.bloodGroups { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-.bloodCard { min-width: 0; text-align: left; padding: 16px; border: 1px solid #e5e9ef; border-radius: 10px; background: #fff; cursor: pointer; transition: border-color 150ms, box-shadow 150ms; }
-.bloodCard:hover { border-color: #e8b7a8; }
-.bloodCardSelected { border-color: #e85a39; box-shadow: 0 0 0 2px #e85a3910; background: #fffaf7; }
-.bloodCardTop { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.bloodCardTop > strong { font-size: 21px; font-weight: 650; letter-spacing: -.04em; }
-.groupStatus { display: inline-flex; align-items: center; gap: 3px; padding: 3px 5px; border-radius: 5px; background: #ecfdf5; color: #047857; font-size: 11px; font-weight: 600; }
-.groupStatusWarning { color: #c34827; background: #ffeddc; }
-.bloodCard > p { margin: 12px 0 8px; font-size: 11px; color: #64748b; }
-.bloodCard > p strong { color: #334155; font-weight: 600; }
-.coverageTrack { height: 4px; overflow: hidden; border-radius: 12px; background: #f1f5f9; }
-.coverageTrack span { display: block; height: 100%; border-radius: inherit; transition: width 200ms; }
-.bloodCardNote { display: block; margin-top: 9px; color: #64748b; font-size: 11px; }
-.panel { min-width: 0; border: 1px solid #e5e9ef; border-radius: 12px; background: #fff; padding: 22px; }
-.chartHeading { display: flex; align-items: center; gap: 12px; }
-.bloodType { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border: 1px solid #f5ddd3; border-radius: 8px; background: #fff6ef; color: #d64c2e; font-size: 20px; font-weight: 650; letter-spacing: -.04em; }
-.chartHeading p { margin: 5px 0 0; font-size: 11px; color: #64748b; line-height: 1.5; }
-.chart { min-width: 0; width: 100%; height: 240px; margin-top: 14px; }
-.chartLegend { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 10px 0; font-size: 11px; color: #64748b; }
-.chartLegend span { display: inline-flex; align-items: center; gap: 6px; }
-.chartLegend i { width: 14px; height: 3px; border-radius: 4px; }
-.chartNote { margin: 0 0 18px; text-align: center; color: #64748b; font-size: 11px; line-height: 1.6; }
-.chartStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 16px; border-top: 1px solid #f1f5f9; }
-.chartStats div { display: flex; flex-direction: column; gap: 6px; }
-.chartStats span { color: #64748b; font-size: 11px; }
-.chartStats strong { font-size: 13px; font-weight: 600; }
-.chartStats small { font-size: 11px; color: #64748b; }
-.warningText { color: #cf4829; }
-.deliveryNote { padding: 10px 12px; margin: 16px 0 0; border-radius: 6px; background: #fffbeb; color: #a16207; font-size: 11px; line-height: 1.6; }
-@media (min-width: 1600px) { .bloodGroups { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
-@media (max-width: 1150px) { .metric { padding: 14px; } .metricLabel { align-items: start; line-height: 1.5; } }
-@media (max-width: 640px) {
-  .helpTrigger { right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 52px; height: 52px; }
-  .workspace { gap: 16px; }
-  .toolbar { grid-template-columns: minmax(0, 1fr); }
-  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .metricValue { font-size: 28px; }
-  .bloodGroups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .panel { padding: 18px; }
-  .chartStats { gap: 10px; }
-  .chartStats strong { font-size: 12px; }
-  .chartHeading h2 { font-size: 14px; }
+.helpTrigger {
+  position: fixed;
+  right: max(34px, env(safe-area-inset-right));
+  bottom: max(34px, env(safe-area-inset-bottom));
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background: var(--glass-surface-strong);
+  color: var(--brand);
+  box-shadow: var(--shadow-popover);
+  backdrop-filter: blur(20px);
+  cursor: pointer;
+  transition: background 150ms;
 }
-@media (prefers-reduced-motion: reduce) { .workspace *, .helpTrigger { transition: none; } }
+
+.helpTrigger:hover {
+  background: #fff;
+}
+
+.helpTrigger:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .helpTrigger {
+    transition: none;
+  }
+}

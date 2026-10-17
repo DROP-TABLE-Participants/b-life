@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BadgeCheck, Boxes, ChartNoAxesCombined, ChevronsUpDown, ClipboardList, House, LogOut, MapPinned, Route, Truck } from "lucide-react";
+import { Activity, BadgeCheck, Boxes, ChartNoAxesCombined, ChevronsUpDown, House, LogOut, MapPinned, Route, Truck } from "lucide-react";
 import type { AdminSection } from "@/lib/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -43,7 +43,7 @@ interface MainViewNavigationItem {
   icon?: AdminSection;
 }
 
-const navigationIcons = { overview: House, inventory: Boxes, forecast: ChartNoAxesCombined, orders: ClipboardList, shipments: Truck, recommendations: Route, map: MapPinned };
+const navigationIcons = { overview: House, inventory: Boxes, forecast: ChartNoAxesCombined, transfers: Truck, recommendations: Route, map: MapPinned };
 
 interface MainViewLogin {
   title: string;

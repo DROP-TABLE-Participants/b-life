@@ -2,109 +2,77 @@ import { RISK_LABELS } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { projectBloodStock } from "@/lib/forecast-planning";
 import { cn } from "@/lib/utils";
-import { BLOOD_TYPES, type Forecast, type Hospital, type RiskLevel } from "@/types/domain";
+import { BLOOD_TYPES, type Forecast, type Hospital, type RiskLevel, type Shipment } from "@/types/domain";
 import { ArrowUpRight } from "lucide-react";
-import surfaceStyles from "./DashboardCardSurface.module.css";
 import { MeshGradientBackground } from "./MeshGradientBackground";
 import styles from "./HospitalBloodInventoryCards.module.css";
 
-const riskBadgeClassNames: Record<RiskLevel, string> = {
-  safe: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  elevated: "border-amber-200 bg-amber-50 text-amber-700",
-  high: "border-orange-200 bg-orange-50 text-orange-700",
-  critical: "border-rose-200 bg-rose-50 text-rose-700",
+// Colour and intensity both scale with risk: safe stays faint, critical is strongest.
+export const RISK_MESH: Record<RiskLevel, { colors: [string, string, string]; intensity: number }> = {
+  safe: { colors: ["#34d399", "#5eead4", "#a7f3d0"], intensity: 0.55 },
+  elevated: { colors: ["#fbbf24", "#fde047", "#fed7aa"], intensity: 0.7 },
+  high: { colors: ["#fb923c", "#fdba74", "#fca5a5"], intensity: 0.8 },
+  critical: { colors: ["#f43f5e", "#fb7185", "#fb923c"], intensity: 0.95 },
 };
 
-const riskBadgeLabels = RISK_LABELS;
+interface BloodGroupCardProps {
+  hospital: Hospital;
+  bloodType: (typeof BLOOD_TYPES)[number];
+  forecast?: Forecast;
+  shipments: Shipment[];
+  onSelect?: () => void;
+  className?: string;
+}
 
-const riskMeshColors: Record<
-  RiskLevel,
-  { colorA: string; colorB: string; colorC: string; accent: string }
-> = {
-  safe: {
-    colorA: "rgba(52, 211, 153, 0.76)",
-    colorB: "rgba(45, 212, 191, 0.64)",
-    colorC: "rgba(134, 239, 172, 0.52)",
-    accent: "rgba(16, 185, 129, 0.58)",
-  },
-  elevated: {
-    colorA: "rgba(250, 204, 21, 0.76)",
-    colorB: "rgba(251, 191, 36, 0.68)",
-    colorC: "rgba(253, 224, 71, 0.54)",
-    accent: "rgba(245, 158, 11, 0.56)",
-  },
-  high: {
-    colorA: "rgba(251, 146, 60, 0.78)",
-    colorB: "rgba(249, 115, 22, 0.7)",
-    colorC: "rgba(253, 186, 116, 0.56)",
-    accent: "rgba(234, 88, 12, 0.58)",
-  },
-  critical: {
-    colorA: "rgba(248, 113, 113, 0.8)",
-    colorB: "rgba(244, 63, 94, 0.72)",
-    colorC: "rgba(251, 146, 60, 0.5)",
-    accent: "rgba(225, 29, 72, 0.62)",
-  },
-} as const;
+export function BloodGroupCard({ hospital, bloodType, forecast, shipments, onSelect, className }: BloodGroupCardProps) {
+  const risk = forecast?.shortageRiskLevel ?? "safe";
+  const units = hospital.inventoryByBloodType[bloodType] ?? 0;
+  const need = forecast ? Math.ceil(projectBloodStock(hospital, forecast, shipments, 48).demandUnits - 1e-9) : null;
+
+  return (
+    <Card className={cn(styles.inventoryCard, onSelect && styles.inventoryCardInteractive, className)} onClick={onSelect}>
+      <MeshGradientBackground seed={`${hospital.id}-${bloodType}`} {...RISK_MESH[risk]} />
+      <CardContent className={styles.inventoryCardContent}>
+        <div className={styles.inventoryCardHeaderTopRow}>
+          <CardTitle className={styles.inventoryCardGroup}>{bloodType}</CardTitle>
+          <Badge variant={risk} dot>{RISK_LABELS[risk]}</Badge>
+        </div>
+        <div className={styles.inventoryAmountRow}>
+          <div>
+            <div className={styles.inventoryAmountValueGroup}>
+              <span className={styles.inventoryAmountValue}>{units}</span>
+              {need !== null && <span className={styles.inventoryAmountNeed}>/ {need}</span>}
+            </div>
+            <p className={styles.inventoryAmountCaption}>{need !== null ? "ед. налични / нужни за 48 ч." : "ед. налични"}</p>
+          </div>
+          {onSelect && <Button type="button" variant="ghost" size="icon-sm" className={styles.inventoryExpandButton}
+            onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+            <ArrowUpRight />
+            <span className="sr-only">Подробности за {bloodType}</span>
+          </Button>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 interface HospitalBloodInventoryCardsProps {
   hospital: Hospital;
   forecasts: Forecast[];
+  shipments: Shipment[];
   onSelectBloodType?: (bloodType: (typeof BLOOD_TYPES)[number]) => void;
 }
 
-export function HospitalBloodInventoryCards({ hospital, forecasts, onSelectBloodType }: HospitalBloodInventoryCardsProps) {
-  const chartDomainMax = Math.max(
-    10,
-    ...BLOOD_TYPES.map((bloodType) => hospital.inventoryByBloodType[bloodType] ?? 0),
-  );
-
+export function HospitalBloodInventoryCards({ hospital, forecasts, shipments, onSelectBloodType }: HospitalBloodInventoryCardsProps) {
   return (
     <div className={styles.inventoryGrid}>
-      {BLOOD_TYPES.map((bloodType) => {
-        const forecast = forecasts.find((item) => item.bloodType === bloodType);
-        const risk = forecast?.shortageRiskLevel ?? "safe";
-        const units = hospital.inventoryByBloodType[bloodType] ?? 0;
-
-        return (
-          <Card
-            key={bloodType}
-            className={cn(surfaceStyles.dashboardCardSurface, styles.inventoryCard)}
-            onClick={() => onSelectBloodType?.(bloodType)}
-          >
-            <MeshGradientBackground seed={`${hospital.id}-${bloodType}`} {...riskMeshColors[risk]} />
-            <CardContent className={styles.inventoryCardContent}>
-              <div className={styles.inventoryCardHeaderTopRow}>
-                <CardTitle className={styles.inventoryCardGroup}>{bloodType}</CardTitle>
-                <Badge className={cn(styles.inventoryCardRisk, riskBadgeClassNames[risk])} variant="outline">
-                  {riskBadgeLabels[risk]}
-                </Badge>
-              </div>
-              <div className={styles.inventoryAmountRow}>
-                <div className={styles.inventoryAmountValueGroup}>
-                  <span className={styles.inventoryAmountValue}>{units}</span>
-                  <span className={styles.inventoryAmountDivider}>/</span>
-                  <span className={styles.inventoryAmountMax}>{chartDomainMax}</span>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className={styles.inventoryExpandButton}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onSelectBloodType?.(bloodType);
-                  }}
-                >
-                  <ArrowUpRight />
-                  <span className="sr-only">Подробности за {bloodType}</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+      {BLOOD_TYPES.map((bloodType) => (
+        <BloodGroupCard key={bloodType} hospital={hospital} bloodType={bloodType} shipments={shipments}
+          forecast={forecasts.find((item) => item.bloodType === bloodType)}
+          onSelect={onSelectBloodType ? () => onSelectBloodType(bloodType) : undefined} />
+      ))}
     </div>
   );
 }
