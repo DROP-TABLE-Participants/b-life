@@ -50,12 +50,13 @@ Only the sender can dispatch; only the recipient can mark an in-transit shipment
 Inventory is deducted on dispatch and credited once on receipt. Simulated arrival waits for receipt confirmation.
 Each facility has separate **Наличности**, **Прогнози**, **Заявки**, **Пратки**, **Препоръки**, and **Карта** pages in the sidebar.
 The Ministry also has an **Общ преглед** page; all of its pages remain read-only.
+Dropdowns use the shared Radix UI select components, with consistent orange focus/selection accents and keyboard navigation. Form fields use `components/ui/FieldSelect.tsx`; the base corner radius is controlled by `--radius` in `app/globals.css`.
 Account switching preserves the current section. Shared layouts keep the selected account, sidebar, storage synchronization, and shipment simulation active across navigation.
 
-The **Прогнози** page plans stock over 24 or 48 hours, with optional +20% and +40% demand scenarios that do not modify saved data.
+The **Прогнози** page shows the baseline stock forecast for the next 48 hours, with selectable facilities and blood groups and a full-width balance chart.
 It subtracts reserved outbound units and spreads cumulative demand within each day, then adds in-transit shipments at their current ETA.
-The replenishment plan covers the largest shortfall during the period, including gaps before a late delivery; surplus in one blood type cannot offset another.
-Unsent inbound shipments are shown separately. Forecast order links prefill a blood type and quantity for the current facility, requiring the usual supplier selection and submission.
+The replenishment metric covers the largest shortfall during the period, including gaps before a late delivery; surplus in one blood type cannot offset another.
+Unsent inbound shipments are shown separately. The floating help button opens the forecast methodology in a right-hand panel.
 The page explains these assumptions and does not present the planning calculation as measured model accuracy.
 
 The Mapbox map is restricted to Bulgaria, with foreign territory and labels masked outside its border.

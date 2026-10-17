@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FieldSelect } from "@/components/ui/FieldSelect";
 import { availableInventoryUnits, eligibleOrderSuppliers } from "@/lib/inventory";
 import { PRIORITY_LABELS } from "@/lib/labels";
 import { BLOOD_TYPES, type BloodOrderDraft, type BloodType, type Hospital, type PriorityLevel, type Shipment } from "@/types/domain";
@@ -14,8 +15,6 @@ interface BloodOrderComposerProps {
   shipments: Shipment[];
   onOrder: (draft: BloodOrderDraft) => boolean;
 }
-
-const selectClassName = "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 
 export function BloodOrderComposer({ hospital, hospitals, shipments, onOrder }: BloodOrderComposerProps) {
   const searchParams = useSearchParams();
@@ -41,23 +40,16 @@ export function BloodOrderComposer({ hospital, hospitals, shipments, onOrder }: 
       <p className="text-sm text-muted-foreground">Изберете кръвна група и количество. Показват се само доставчици с достатъчна свободна наличност. След приемане доставчикът изпраща пратката, а Вие потвърждавате получаването.</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm">Заявена кръвна група
-          <select className={selectClassName} value={bloodType} onChange={(event) => { setBloodType(event.target.value as BloodType); setMessage(""); }}>
-            {BLOOD_TYPES.map((type) => <option key={type}>{type}</option>)}
-          </select>
+          <FieldSelect label="Заявена кръвна група" value={bloodType} onValueChange={(value) => { setBloodType(value as BloodType); setMessage(""); }} options={BLOOD_TYPES.map((type) => ({ value: type, label: type }))} />
         </label>
         <label className="grid gap-2 text-sm">Заявено количество (единици)
-          <Input type="number" min={1} step={1} value={quantity} onChange={(event) => { setQuantity(Number(event.target.value)); setMessage(""); }} required />
+          <Input className="h-10" type="number" min={1} step={1} value={quantity} onChange={(event) => { setQuantity(Number(event.target.value)); setMessage(""); }} required />
         </label>
         <label className="grid min-w-0 gap-2 text-sm">Доставчик
-          <select className={selectClassName} value={selectedSupplier?.id ?? ""} disabled={suppliers.length === 0} onChange={(event) => { setSupplierId(event.target.value); setMessage(""); }} required>
-            {suppliers.length === 0 && <option value="">Няма подходящ доставчик</option>}
-            {suppliers.map((item) => <option key={item.id} value={item.id}>{item.name} · {availableInventoryUnits(inventory, item.id, bloodType)} ед.</option>)}
-          </select>
+          <FieldSelect label="Доставчик" value={selectedSupplier?.id ?? ""} disabled={suppliers.length === 0} onValueChange={(value) => { setSupplierId(value); setMessage(""); }} placeholder="Няма подходящ доставчик" required options={suppliers.map((item) => ({ value: item.id, label: `${item.name} · ${availableInventoryUnits(inventory, item.id, bloodType)} ед.` }))} />
         </label>
         <label className="grid gap-2 text-sm">Приоритет на заявката
-          <select className={selectClassName} value={priority} onChange={(event) => setPriority(event.target.value as PriorityLevel)}>
-            {(Object.keys(PRIORITY_LABELS) as PriorityLevel[]).map((value) => <option key={value} value={value}>{PRIORITY_LABELS[value]}</option>)}
-          </select>
+          <FieldSelect label="Приоритет на заявката" value={priority} onValueChange={(value) => setPriority(value as PriorityLevel)} options={(Object.keys(PRIORITY_LABELS) as PriorityLevel[]).map((value) => ({ value, label: PRIORITY_LABELS[value] }))} />
         </label>
       </div>
       {selectedSupplier && <p className="text-sm">{selectedSupplier.name}: {availableInventoryUnits(inventory, selectedSupplier.id, bloodType)} ед. свободна наличност от {bloodType}.</p>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FieldSelect } from "@/components/ui/FieldSelect";
 import { HospitalBloodInventoryCards } from "@/components/dashboard/HospitalBloodInventoryCards";
 import { BloodTypeInsightSheet } from "@/components/dashboard/BloodTypeInsightSheet";
 import type { BloodType, Forecast, Hospital, Shipment, TransferRecommendation } from "@/types/domain";
@@ -16,9 +17,7 @@ export function InventoryPanel({ hospitals, facilities = hospitals, forecasts, s
   const ownShipments = shipments.filter((item) => item.fromHospitalId === facility.id || item.toHospitalId === facility.id);
   return <div className="space-y-4">
     {facilities.length > 1 && <label className="grid max-w-xl gap-2 text-sm">Наличности на
-      <select className="h-10 w-full rounded-md border bg-white px-3" value={facility.id} onChange={(event) => { setFacilityId(event.target.value); setBloodType(null); }}>
-        {facilities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </select>
+      <FieldSelect label="Наличности на" value={facility.id} onValueChange={(value) => { setFacilityId(value); setBloodType(null); }} options={facilities.map((item) => ({ value: item.id, label: item.name }))} />
     </label>}
     <HospitalBloodInventoryCards hospital={facility} forecasts={ownForecasts} onSelectBloodType={setBloodType} />
     <BloodTypeInsightSheet open={bloodType !== null} bloodType={bloodType} hospital={facility} hospitals={hospitals}

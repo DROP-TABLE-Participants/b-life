@@ -153,7 +153,7 @@
   overflow: auto;
   background-color: var(--main-view-router-card-background);
   border: 1px solid var(--main-view-router-card-border);
-  border-radius: 24px;
+  border-radius: 12px;
   box-shadow: var(--main-view-router-card-shadow);
 }
 
@@ -224,7 +224,7 @@
   }
 
   .mainViewRouterCard {
-    border-radius: 20px;
+    border-radius: 12px;
   }
 
   .mainViewRouterCardContent {

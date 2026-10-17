@@ -64,7 +64,7 @@ export default function LandingPage() {
                 <div className="space-y-2">
                   <Label htmlFor="account" className="text-[rgb(60,66,87)]">Акаунт</Label>
                   <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                    <SelectTrigger id="account" className="h-auto min-h-10 w-full text-left [&>span]:whitespace-normal">
+                    <SelectTrigger id="account" className="h-auto min-h-10 w-full text-left [&>[data-slot=select-value]]:whitespace-normal [&>[data-slot=select-value]]:overflow-visible">
                       <SelectValue placeholder="Изберете акаунт" />
                     </SelectTrigger>
                     <SelectContent>

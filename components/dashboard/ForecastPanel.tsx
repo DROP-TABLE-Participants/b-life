@@ -2,13 +2,15 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
+import { FieldSelect } from "@/components/ui/FieldSelect";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { projectBloodStock, summarizeStockProjections, type ForecastHorizon, type StockProjection } from "@/lib/forecast-planning";
+import { projectBloodStock, summarizeStockProjections, type StockProjection } from "@/lib/forecast-planning";
 import { cn } from "@/lib/utils";
 import { BLOOD_TYPES, type BloodType, type Forecast, type Hospital, type Shipment } from "@/types/domain";
 import styles from "./ForecastPanel.module.css";
 
 const number = new Intl.NumberFormat("bg-BG", { maximumFractionDigits: 1 });
+const horizon = 48;
 const duration = (hour: number) => hour <= 0 ? "сега" : hour < 1 ? "под 1 час" : `около ${Math.round(hour)} ${Math.round(hour) === 1 ? "час" : "часа"}`;
 
 interface ForecastPanelProps {
@@ -16,20 +18,16 @@ interface ForecastPanelProps {
   forecasts: Forecast[];
   shipments: Shipment[];
   workspaceBase: string;
-  operatingFacilityId?: string;
 }
 
-export function ForecastPanel({ hospitals, forecasts, shipments, workspaceBase, operatingFacilityId }: ForecastPanelProps) {
+export function ForecastPanel({ hospitals, forecasts, shipments, workspaceBase }: ForecastPanelProps) {
   const [facilityId, setFacilityId] = useState(hospitals[0]?.id ?? "");
   const [bloodType, setBloodType] = useState<BloodType | null>(null);
-  const [horizon, setHorizon] = useState<ForecastHorizon>(48);
-  const [extraDemand, setExtraDemand] = useState(0);
   const facility = hospitals.find((item) => item.id === facilityId) ?? hospitals[0];
   const rows = facility ? forecasts.filter((item) => item.hospitalId === facility.id)
-    .map((item) => projectBloodStock(facility, item, shipments, horizon, extraDemand)) : [];
+    .map((item) => projectBloodStock(facility, item, shipments, horizon)) : [];
   const summary = summarizeStockProjections(rows);
   const focused = rows.find((item) => item.bloodType === bloodType) ?? summary.shortages[0] ?? rows[0];
-  const isOwnFacility = facility?.id === operatingFacilityId;
   const hasGaps = summary.shortages.length > 0;
   const totalReservations = rows.reduce((sum, item) => sum + item.reservedUnits, 0);
   const metrics = [
@@ -42,16 +40,8 @@ export function ForecastPanel({ hospitals, forecasts, shipments, workspaceBase, 
   return <div className={styles.workspace}>
     <section className={styles.toolbar} aria-label="Настройки на прогнозата">
       <label className={styles.facilitySelect}>Прогноза за
-        <select value={facility?.id ?? ""} onChange={(event) => { setFacilityId(event.target.value); setBloodType(null); }}>
-          {hospitals.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
+        <FieldSelect label="Прогноза за" value={facility?.id ?? ""} onValueChange={(value) => { setFacilityId(value); setBloodType(null); }} options={hospitals.map((item) => ({ value: item.id, label: item.name }))} className="h-11 text-[13px]" />
       </label>
-      <div className={styles.horizonControl}>
-        <span>Период напред</span>
-        <div className={styles.segmented} aria-label="Период на прогнозата">
-          {([24, 48] as const).map((hours) => <button key={hours} type="button" aria-pressed={horizon === hours} onClick={() => setHorizon(hours)}>{hours} часа</button>)}
-        </div>
-      </div>
     </section>
 
     {rows.length === 0 ? <section className={styles.panel}><h2>Все още няма прогноза за този обект</h2><p>Изберете друг обект, за да разгледате наличните прогнози.</p></section> : <>
@@ -70,15 +60,8 @@ export function ForecastPanel({ hospitals, forecasts, shipments, workspaceBase, 
         </section>)}
       </div>
 
-      <section className={styles.scenario}>
-        <div><h2>Сценарий на потребление</h2><p>Увеличение спрямо прогнозната потребност.</p></div>
-        <div className={styles.segmented} aria-label="Сценарий на потребление">
-          {[0, 20, 40].map((percent) => <button type="button" key={percent} aria-pressed={extraDemand === percent} onClick={() => setExtraDemand(percent)}>{percent === 0 ? "По прогноза" : `+${percent}%`}</button>)}
-        </div>
-      </section>
-
       <section aria-labelledby="blood-groups-title">
-        <div className={styles.sectionHeading}><div><h2 id="blood-groups-title">Прогноза по кръвни групи</h2><p>Изберете кръвна група за подробности.</p></div><span className={styles.smallLabel}>{rows.length} кръвни групи</span></div>
+        <div className={styles.sectionHeading}><div><h2 id="blood-groups-title">Прогноза по кръвни групи</h2><p>Изберете кръвна група за подробности.</p></div></div>
         <div className={styles.bloodGroups}>
           {BLOOD_TYPES.flatMap((type) => {
             const row = rows.find((item) => item.bloodType === type);
@@ -87,29 +70,10 @@ export function ForecastPanel({ hospitals, forecasts, shipments, workspaceBase, 
         </div>
       </section>
 
-      {focused && <div className={styles.mainGrid}>
-        <ProjectionChart row={focused} horizon={horizon} workspaceBase={workspaceBase} />
-        <section className={styles.panel}>
-          <h2>План за допълване</h2>
-          {!hasGaps && <p className={styles.muted}>Не е необходимо допълване за {horizon} часа при този сценарий.</p>}
-          {hasGaps ? <div className={styles.actionList}>
-            {summary.shortages.map((row) => <div className={styles.actionRow} key={row.bloodType}>
-              <div><button type="button" className={styles.groupLink} onClick={() => setBloodType(row.bloodType)}>{row.bloodType}</button><p>{duration(row.firstShortageHour ?? 0)}</p></div>
-              <div className={styles.actionQuantity}><strong>+{row.replenishmentUnits} ед.</strong>{isOwnFacility && <Link href={orderHref(workspaceBase, row)}>Заяви</Link>}</div>
-            </div>)}
-          </div> : null}
-          <Link href={`${workspaceBase}/${hasGaps ? "recommendations" : "shipments"}`} className={styles.actionButton}>{hasGaps ? "Към препоръките" : "Към пратките"}</Link>
-          {hasGaps && !isOwnFacility && <p className={styles.footnote}>Преглед на избрания обект. Заявките се създават от неговия акаунт.</p>}
-          {hasGaps && isOwnFacility && <p className={styles.footnote}>„Заяви“ попълва формата. Вие избирате доставчик и потвърждавате изпращането.</p>}
-        </section>
-      </div>}
+      {focused && <ProjectionChart row={focused} workspaceBase={workspaceBase} />}
 
     </>}
   </div>;
-}
-
-function orderHref(base: string, row: StockProjection) {
-  return `${base}/orders?${new URLSearchParams({ bloodType: row.bloodType, quantity: String(row.replenishmentUnits) })}`;
 }
 
 function BloodGroupCard({ row, selected, onSelect }: { row: StockProjection; selected: boolean; onSelect: () => void }) {
@@ -123,7 +87,7 @@ function BloodGroupCard({ row, selected, onSelect }: { row: StockProjection; sel
   </button>;
 }
 
-function ProjectionChart({ row, horizon, workspaceBase }: { row: StockProjection; horizon: ForecastHorizon; workspaceBase: string }) {
+function ProjectionChart({ row, workspaceBase }: { row: StockProjection; workspaceBase: string }) {
   const gradientId = useId().replaceAll(":", "");
   return <section className={styles.panel} aria-label={`Прогнозен баланс за ${row.bloodType}`}>
     <div className={styles.chartHeading}><div className={styles.bloodType}>{row.bloodType}</div><div><h2>Прогнозен баланс</h2><p>Очакван баланс в единици през следващите {horizon} часа</p></div></div>
@@ -133,7 +97,7 @@ function ProjectionChart({ row, horizon, workspaceBase }: { row: StockProjection
         <CartesianGrid vertical={false} stroke="#e9edf2" strokeDasharray="3 4" />
         <XAxis dataKey="hour" type="number" domain={[0, horizon]} ticks={Array.from({ length: horizon / 6 + 1 }, (_, index) => index * 6)} tickFormatter={(hour: number) => hour === 0 ? "Сега" : `${hour} ч.`} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#64748b" }} minTickGap={12} dy={8} />
         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#64748b" }} allowDecimals={false} />
-        <Tooltip labelFormatter={(hour) => Number(hour) === 0 ? "Сега" : `След ${number.format(Number(hour))} ч.`} formatter={(value, name) => [`${number.format(Number(value))} ед.`, name]} contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12, boxShadow: "0 8px 24px #0f172a0d" }} />
+        <Tooltip labelFormatter={(hour) => Number(hour) === 0 ? "Сега" : `След ${number.format(Number(hour))} ч.`} formatter={(value, name) => [`${number.format(Number(value))} ед.`, name]} contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12, boxShadow: "0 8px 24px #0f172a0d" }} />
         <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
         <Line dataKey="withoutDeliveries" name="Без доставки" type="linear" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={2} dot={false} isAnimationActive={false} />
         <Area dataKey="withDeliveries" name="С пътуващи доставки" type="linear" stroke="#e85a39" strokeWidth={3} fill={`url(#${gradientId})`} isAnimationActive={false} />

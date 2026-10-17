@@ -6,7 +6,7 @@ import styles from "./ForecastPanel.module.css";
 
 const steps = [
   { title: "Свободен запас", text: "От физическата наличност изваждаме количествата в планирани и одобрени изходящи пратки. Изпратената кръв вече е извадена от наличностите." },
-  { title: "Очаквано потребление", text: "Потребността се изчислява по зададения профил, капацитет, регион и сезонност. Разпределяме я равномерно в рамките на всеки 24 часа. Сценариите „+20%“ и „+40%“ променят само този преглед." },
+  { title: "Очаквано потребление", text: "Прогнозата е за следващите 48 часа, без допълнително увеличение на потреблението. Потребността се изчислява по зададения профил, капацитет, регион и сезонност. Разпределяме я равномерно в рамките на всеки 24 часа." },
   { title: "Пътуващи доставки", text: "Включваме само пратки в движение или със закъснение, в очаквания им час на пристигане. Това са очаквани количества — наличността се променя след потвърдено получаване." },
   { title: "Необходимо допълване", text: "„За допълване“ е най-големият непокрит недостиг през избрания период, включително преди закъсняла доставка. Излишъкът от една група не компенсира друга. Не се добавя допълнителен резерв." },
 ];
@@ -17,7 +17,7 @@ export function ForecastHelpSheet() {
     <SheetContent side="right" className="overflow-y-auto bg-white p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[480px] data-[side=right]:data-starting-style:translate-x-full data-[side=right]:data-ending-style:translate-x-full motion-reduce:transition-none">
       <SheetHeader className="gap-3 border-b border-slate-100 p-7 pr-12">
         <SheetTitle className="text-lg font-semibold text-slate-900">Разчитане на прогнозата</SheetTitle>
-        <SheetDescription className="text-sm leading-6 text-slate-500">Изчисления, доставки и недостиг за избрания период.</SheetDescription>
+        <SheetDescription className="text-sm leading-6 text-slate-500">Изчисления, доставки и недостиг за следващите 48 часа.</SheetDescription>
       </SheetHeader>
       <div className="space-y-7 px-7 pb-8 pt-2">
         <ol className="space-y-7">

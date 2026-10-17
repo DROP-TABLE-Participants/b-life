@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FieldSelect } from "@/components/ui/FieldSelect";
 import { PRIORITY_LABELS } from "@/lib/labels";
 import { availableInventoryUnits } from "@/lib/inventory";
 import { BLOOD_TYPES, type Hospital, type ManualShipmentDraft, type Shipment } from "@/types/domain";
@@ -13,8 +14,6 @@ interface ShipmentComposerProps {
   shipments: Shipment[];
   onSchedule: (draft: ManualShipmentDraft) => boolean;
 }
-
-const selectClassName = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
 
 export function ShipmentComposer({ hospital, hospitals, shipments, onSchedule }: ShipmentComposerProps) {
   const [destination, setDestination] = useState(hospitals.find((item) => item.id !== hospital.id)?.id ?? "");
@@ -37,30 +36,22 @@ export function ShipmentComposer({ hospital, hospitals, shipments, onSchedule }:
       <p className="text-sm text-muted-foreground">Изпращане от {hospital.name}. {available} ед. от {bloodType} на разположение ({reserved} ед. резервирани).</p>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <label className="grid gap-2 text-sm">Получател
-          <select className={selectClassName} value={destination} onChange={(event) => setDestination(event.target.value)} required>
-            {hospitals.filter((item) => item.id !== hospital.id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
+          <FieldSelect label="Получател" value={destination} onValueChange={setDestination} required options={hospitals.filter((item) => item.id !== hospital.id).map((item) => ({ value: item.id, label: item.name }))} />
         </label>
         <label className="grid gap-2 text-sm">Кръвна група
-          <select className={selectClassName} value={bloodType} onChange={(event) => setBloodType(event.target.value as Shipment["bloodType"])}>
-            {BLOOD_TYPES.map((type) => <option key={type}>{type}</option>)}
-          </select>
+          <FieldSelect label="Кръвна група" value={bloodType} onValueChange={(value) => setBloodType(value as Shipment["bloodType"])} options={BLOOD_TYPES.map((type) => ({ value: type, label: type }))} />
         </label>
         <label className="grid gap-2 text-sm">Количество (единици)
-          <Input type="number" min={1} max={available} step={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} required />
+          <Input className="h-10" type="number" min={1} max={available} step={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} required />
         </label>
         <label className="grid gap-2 text-sm">Очаквано пристигане (минути)
-          <Input type="number" min={5} step={1} value={etaMinutes} onChange={(event) => setEtaMinutes(Number(event.target.value))} required />
+          <Input className="h-10" type="number" min={5} step={1} value={etaMinutes} onChange={(event) => setEtaMinutes(Number(event.target.value))} required />
         </label>
         <label className="grid gap-2 text-sm">Приоритет
-          <select className={selectClassName} value={priority} onChange={(event) => setPriority(event.target.value as Shipment["priority"])}>
-            {(Object.keys(PRIORITY_LABELS) as Shipment["priority"][]).map((value) => <option key={value} value={value}>{PRIORITY_LABELS[value]}</option>)}
-          </select>
+          <FieldSelect label="Приоритет" value={priority} onValueChange={(value) => setPriority(value as Shipment["priority"])} options={(Object.keys(PRIORITY_LABELS) as Shipment["priority"][]).map((value) => ({ value, label: PRIORITY_LABELS[value] }))} />
         </label>
         <label className="grid gap-2 text-sm">Действие
-          <select className={selectClassName} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>
-            <option value="planned">Планиране на пратка</option><option value="in_transit">Изпращане сега</option>
-          </select>
+          <FieldSelect label="Действие" value={status} onValueChange={(value) => setStatus(value as typeof status)} options={[{ value: "planned", label: "Планиране на пратка" }, { value: "in_transit", label: "Изпращане сега" }]} />
         </label>
       </div>
       <Button type="submit" disabled={!destination || quantity < 1 || quantity > available}>{status === "planned" ? "Планиране на пратка" : "Изпращане на пратка"}</Button>
