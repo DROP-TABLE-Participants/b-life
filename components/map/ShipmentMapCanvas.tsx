@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import MapView, { Layer, Marker, Source, type LayerProps, type LineLayerSpecification, type MapRef, type MapMouseEvent } from "react-map-gl/mapbox";
 import type { FeatureCollection, LineString } from "geojson";
-import { Building2, ChartNoAxesCombined, Hospital as HospitalIcon, Minus, Plus, Scan, Send, Sparkles, Truck } from "lucide-react";
+import { Building2, ChartNoAxesCombined, Hospital as HospitalIcon, Minus, PanelLeftClose, PanelLeftOpen, Plus, Scan, Send, Sparkles, Truck } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -80,6 +80,7 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
   const [routeCoordinates, setRouteCoordinates] = useState<Record<string, [number, number][]>>({});
   const [mapError, setMapError] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [hover, setHover] = useState<{ ids: string[]; x: number; y: number; width: number; height: number } | null>(null);
   const hospitalById = new Map(hospitals.map((facility) => [facility.id, facility]));
   const activeShipments = shipments.filter((item) => item.status !== "delivered" && item.status !== "cancelled" &&
@@ -210,12 +211,16 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
     </div>
 
     <div className="pointer-events-none absolute top-6 left-6 flex w-[360px] max-w-[calc(100%-3rem)] flex-col gap-3">
-      <div className={cn(glass, "pointer-events-auto px-5 py-4")}>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Карта</h1>
-        <p className="text-xs text-ink-secondary">Мрежа за кръвоснабдяване · {hospitals.length} обекта · {activeShipments.length} активни пратки</p>
-      </div>
-      {!selectedHospital && <div className={cn(glass, "pointer-events-auto max-h-[calc(100dvh-220px)] overflow-y-auto px-2 py-3")}>
-        <p className="flex gap-1.5 px-3 pt-1 pb-1.5 text-xs font-medium text-ink-secondary">Обекти<span className="font-normal text-ink-muted">{hospitals.length}</span></p>
+      {!selectedHospital && panelCollapsed && <button type="button" onClick={() => setPanelCollapsed(false)} aria-expanded={false}
+        className={cn(glass, "pointer-events-auto inline-flex w-fit items-center gap-2 px-4 py-2.5 text-xs font-medium text-ink hover:bg-white")}>
+        <PanelLeftOpen className="size-4 text-ink-secondary" />Обекти и пратки
+        <span className="text-ink-muted">{hospitals.length} · {activeShipments.length}</span>
+      </button>}
+      {!selectedHospital && !panelCollapsed && <div className={cn(glass, "pointer-events-auto max-h-[calc(100dvh-120px)] overflow-y-auto px-2 py-3")}>
+        <div className="flex items-center justify-between pr-1 pl-3">
+          <p className="flex gap-1.5 pt-1 pb-1.5 text-xs font-medium text-ink-secondary">Обекти<span className="font-normal text-ink-muted">{hospitals.length}</span></p>
+          <Button variant="ghost" size="icon-sm" aria-label="Скриване на панела" aria-expanded onClick={() => setPanelCollapsed(true)}><PanelLeftClose /></Button>
+        </div>
         {hospitals.map((facility) => {
           const short = shortagesByFacility.get(facility.id) ?? [];
           return <button key={facility.id} type="button" onClick={() => chooseHospital(facility.id)}
@@ -228,10 +233,9 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
         <div className="my-2 border-t border-hairline" />
         <p className="flex gap-1.5 px-3 pb-1.5 text-xs font-medium text-ink-secondary">Активни пратки<span className="font-normal text-ink-muted">{activeShipments.length}</span></p>
         {activeShipments.length === 0 && <p className="px-3 pb-2 text-xs text-ink-muted">Няма активни пратки.</p>}
-        {activeShipments.map((item) => <button key={item.id} type="button" onClick={() => chooseShipment(item.id)} className="w-full space-y-1.5 rounded-xl px-3 py-2 text-left hover:bg-white">
+        {activeShipments.map((item) => <button key={item.id} type="button" onClick={() => chooseShipment(item.id)} className="w-full rounded-xl px-3 py-2 text-left hover:bg-white">
           <span className="flex justify-between gap-3 text-xs"><span className="font-medium text-ink">{item.bloodType} · {item.quantity} ед. {name(item.fromHospitalId)} → {name(item.toHospitalId)}</span>
             <span className={item.status === "delayed" ? "text-elevated" : "text-ink-secondary"}>{!moving(item) ? "очаква изпращане" : item.progress >= 1 ? "пристигна" : `~${formatMinutes(item.etaMinutes)}`}</span></span>
-          <span aria-hidden="true" className="block h-1 overflow-hidden rounded-full bg-hairline"><span className={cn("block h-full rounded-full", item.status === "delayed" ? "bg-elevated" : "bg-brand")} style={{ width: `${moving(item) ? Math.round(item.progress * 100) : 0}%` }} /></span>
         </button>)}
       </div>}
     </div>
@@ -241,13 +245,6 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
         <Button variant="ghost" size="icon" aria-label="Приближаване" onClick={() => mapRef.current?.zoomIn()}><Plus /></Button>
         <Button variant="ghost" size="icon" aria-label="Отдалечаване" onClick={() => mapRef.current?.zoomOut()}><Minus /></Button>
         <Button variant="ghost" size="icon" aria-label="Цяла България" onClick={() => resetView()}><Scan /></Button>
-      </div>
-      <div className={cn(glass, "flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-xs text-ink-secondary")}>
-        <span className="inline-flex items-center gap-2"><i className="h-[3px] w-4 rounded bg-brand" />В движение</span>
-        <span className="inline-flex items-center gap-2"><i className="h-[3px] w-4 rounded bg-elevated" />Закъснява</span>
-        <span className="inline-flex items-center gap-2"><i className="w-4 border-t-2 border-dashed border-ink-muted" />Одобрена · очаква изпращане</span>
-        {(["national_center", "regional_center", "hospital"] as const).map((kind) => <span key={kind} className="inline-flex items-center gap-1.5">
-          <i className="size-2.5 rounded-full border-[1.5px] border-white" style={{ backgroundColor: FACILITY_COLORS[kind] }} />{FACILITY_ROLE_LABELS[kind]}</span>)}
       </div>
     </div>
     {hover && <RouteTooltip x={hover.x} y={hover.y} width={hover.width} height={hover.height}
@@ -346,23 +343,19 @@ function RouteTooltip({ x, y, width, height, shipments, name }: { x: number; y: 
   if (shipments.length === 0) return null;
   const tooltipWidth = 280;
   const flip = x + 16 + tooltipWidth > width - 16;
-  // In the lower half the tooltip opens upwards so it never runs under the legend.
+  // In the lower half the tooltip opens upwards so it stays inside the map.
   const above = y > height * 0.5;
   return <div role="tooltip" className={cn(glass, "pointer-events-none absolute z-20 w-[280px] divide-y divide-hairline px-3.5 py-1")}
     style={{ left: flip ? x - 16 - tooltipWidth : x + 16, ...(above ? { bottom: Math.max(12, height - y - 12) } : { top: Math.max(12, y - 12) }) }}>
     {shipments.slice(0, 3).map((item) => {
-      const percent = Math.round(Math.min(1, item.progress) * 100);
-      const state = !moving(item) ? "Очаква изпращане" : item.progress >= 1 ? "Пристигна · очаква потвърждение" : `Пристига след ~${formatMinutes(item.etaMinutes)}`;
+      const state = !moving(item) ? "Очаква изпращане" : item.progress >= 1 ? "Пристигна" : `Пристига след ~${formatMinutes(item.etaMinutes)}`;
       return <div key={item.id} className="space-y-1.5 py-2.5">
         <div className="flex items-center justify-between gap-3">
           <span className="text-sm font-semibold text-ink">{item.bloodType} · {item.quantity} ед.</span>
           <StatusBadge status={item.status} />
         </div>
         <p className="text-xs text-ink-secondary">{name(item.fromHospitalId)} → {name(item.toHospitalId)}</p>
-        <p className={cn("text-xs", item.status === "delayed" ? "text-elevated" : "text-ink")}>{state} · приоритет {PRIORITY_LABELS[item.priority].toLowerCase()}</p>
-        {moving(item) && <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-hairline">
-          <div className={cn("h-full rounded-full", item.status === "delayed" ? "bg-elevated" : "bg-brand")} style={{ width: `${percent}%` }} />
-        </div>}
+        <p className={cn("text-xs font-medium", item.status === "delayed" ? "text-elevated" : "text-ink")}>{state}</p>
       </div>;
     })}
     {shipments.length > 3 && <p className="py-2 text-xs text-ink-muted">Още {shipments.length - 3} по този маршрут</p>}

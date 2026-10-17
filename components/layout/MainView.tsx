@@ -217,7 +217,7 @@ export function MainView({ navigation, login, children }: MainViewProps) {
         style={
           {
             "--sidebar-width": "300px",
-            "--sidebar-width-icon": "55px",
+            "--sidebar-width-icon": "48px",
           } as React.CSSProperties
         }
       >

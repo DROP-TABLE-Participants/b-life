@@ -11,10 +11,10 @@ import styles from "./HospitalBloodInventoryCards.module.css";
 
 // Colour and intensity both scale with risk: safe stays faint, critical is strongest.
 export const RISK_MESH: Record<RiskLevel, { colors: [string, string, string]; intensity: number }> = {
-  safe: { colors: ["#34d399", "#5eead4", "#a7f3d0"], intensity: 0.55 },
-  elevated: { colors: ["#fbbf24", "#fde047", "#fed7aa"], intensity: 0.7 },
-  high: { colors: ["#fb923c", "#fdba74", "#fca5a5"], intensity: 0.8 },
-  critical: { colors: ["#f43f5e", "#fb7185", "#fb923c"], intensity: 0.95 },
+  safe: { colors: ["#34d399", "#5eead4", "#a7f3d0"], intensity: 0.47 },
+  elevated: { colors: ["#fbbf24", "#fde047", "#fed7aa"], intensity: 0.6 },
+  high: { colors: ["#fb923c", "#fdba74", "#fca5a5"], intensity: 0.68 },
+  critical: { colors: ["#f43f5e", "#fb7185", "#fb923c"], intensity: 0.81 },
 };
 
 interface BloodGroupCardProps {
@@ -45,7 +45,6 @@ export function BloodGroupCard({ hospital, bloodType, forecast, shipments, onSel
               <span className={styles.inventoryAmountValue}>{units}</span>
               {need !== null && <span className={styles.inventoryAmountNeed}>/ {need}</span>}
             </div>
-            <p className={styles.inventoryAmountCaption}>{need !== null ? "ед. налични / нужни за 48 ч." : "ед. налични"}</p>
           </div>
           {onSelect && <Button type="button" variant="ghost" size="icon-sm" className={styles.inventoryExpandButton}
             onClick={(event) => { event.stopPropagation(); onSelect(); }}>

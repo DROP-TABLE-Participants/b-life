@@ -89,38 +89,49 @@
 :global([data-state="collapsed"]) .mainViewSidebarHeaderRow {
   flex-direction: column;
   align-items: center;
+  gap: 8px;
 }
 
 :global([data-state="collapsed"]) .mainViewSidebarHeaderMenu {
   flex: 0 0 auto;
 }
 
-:global([data-state="collapsed"]) .mainViewSidebar :global([data-slot="sidebar-menu-button"]) {
+/* Collapsed rail: centred icon buttons, the full logo tile, labels hidden. */
+:global([data-state="collapsed"]) .mainViewSidebar :global([data-slot="sidebar-menu"]) {
+  align-items: center;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebar :global([data-slot="sidebar-menu-item"]) {
+  display: flex;
   justify-content: center;
 }
 
-:global([data-state="collapsed"]) .mainViewSidebarHeaderMenuItem > :global([data-slot="sidebar-menu-button"]) {
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
+:global([data-state="collapsed"]) .mainViewSidebar :global([data-sidebar="menu-button"]) {
+  justify-content: center;
 }
 
-:global([data-state="collapsed"]) .mainViewSidebarBrandLogo img {
-  width: 18px;
-  height: 18px;
+:global([data-state="collapsed"]) .mainViewSidebar :global([data-sidebar="menu-button"] > span),
+:global([data-state="collapsed"]) .mainViewSidebar :global([data-sidebar="menu-button"] > div:not(:first-child)),
+:global([data-state="collapsed"]) .mainViewSidebar :global([data-sidebar="menu-button"] > svg:not(:first-child)) {
+  display: none;
+}
+
+:global([data-state="collapsed"]) .mainViewSidebarHeaderMenuItem > :global([data-sidebar="menu-button"]) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 :global([data-state="collapsed"]) .mainViewSidebarTrigger {
-  width: 2rem;
-  height: 2rem;
+  width: 32px;
+  height: 32px;
   padding: 0;
   align-self: center;
-  margin-inline: auto;
 }
 
 :global([data-state="collapsed"]) .mainViewSidebarTrigger :global(svg) {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 :global([data-state="collapsed"]) .mainViewSidebarBrandText {
@@ -272,7 +283,7 @@
   object-fit: cover;
 }
 
-.mainViewSidebar :global([data-slot="sidebar-menu-button"]) {
+.mainViewSidebar :global([data-sidebar="menu-button"]) {
   height: 36px;
   gap: 10px;
   padding-inline: 12px;
@@ -281,16 +292,16 @@
   color: var(--ink-secondary);
 }
 
-.mainViewSidebar :global([data-slot="sidebar-menu-button"][data-size="lg"]) {
+.mainViewSidebar :global([data-sidebar="menu-button"][data-size="lg"]) {
   height: 48px;
 }
 
-.mainViewSidebar :global([data-slot="sidebar-menu-button"]:hover) {
+.mainViewSidebar :global([data-sidebar="menu-button"]:hover) {
   background: var(--glass-surface-subtle);
   color: var(--ink);
 }
 
-.mainViewSidebar :global([data-slot="sidebar-menu-button"][data-active]) {
+.mainViewSidebar :global([data-sidebar="menu-button"][data-active]) {
   border-color: var(--glass-border);
   background: var(--glass-surface-strong);
   box-shadow: var(--shadow-control);
@@ -298,11 +309,11 @@
   font-weight: 500;
 }
 
-.mainViewSidebar :global([data-slot="sidebar-menu-button"][data-active] svg) {
+.mainViewSidebar :global([data-sidebar="menu-button"][data-active] svg) {
   color: var(--brand);
 }
 
-.mainViewSidebar :global([data-slot="sidebar-footer"] [data-slot="sidebar-menu-button"]) {
+.mainViewSidebar :global([data-slot="sidebar-footer"] [data-sidebar="menu-button"]) {
   border-color: var(--glass-border);
   background: var(--glass-surface-subtle);
 }

@@ -92,13 +92,6 @@
   color: var(--ink-muted);
 }
 
-.inventoryAmountCaption {
-  margin: 0;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--ink-secondary);
-}
-
 .inventoryExpandButton {
   flex-shrink: 0;
   color: var(--ink-muted);

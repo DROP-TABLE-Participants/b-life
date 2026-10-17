@@ -55,7 +55,9 @@ const synthesizeState = (base: AppState): AppState => {
   const retained = base.recommendations.filter((item) => item.status !== "pending_approval");
   const retainedIds = new Set(retained.map((item) => item.id));
   const generated = runRedistributionEngine(hospitals, forecasts, base.shipments);
-  const recommendations = [...retained, ...generated.filter((item) => !retainedIds.has(item.id))].map((item) => ({
+  // Keyed by id so a recommendation can never appear twice (e.g. after syncing state from another tab).
+  const unique = [...new Map([...retained, ...generated.filter((item) => !retainedIds.has(item.id))].map((item) => [item.id, item])).values()];
+  const recommendations = unique.map((item) => ({
     ...item,
     reason: describeTransfer(hospitals.find((facility) => facility.id === item.fromHospitalId)?.name ?? "Изпращачът",
       hospitals.find((facility) => facility.id === item.toHospitalId)?.name ?? "Получателят"),

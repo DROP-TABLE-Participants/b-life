@@ -64,10 +64,7 @@ export function FacilityOverview({ hospital, hospitals, session, shipments, orde
     </PageHeader>
 
     <section className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="flex items-baseline gap-2 text-base font-semibold text-ink">Наличности по кръвни групи<span className="text-xs font-normal text-ink-muted">ед. налични / нужни за {PLANNING_HORIZON} ч.</span></h2>
-        <p className="text-xs text-ink-secondary">Изберете група за подробности</p>
-      </div>
+      <h2 className="text-base font-semibold text-ink">Наличности по кръвни групи</h2>
       <HospitalBloodInventoryCards hospital={hospital} forecasts={ownForecasts} shipments={shipments} onSelectBloodType={setBloodType} />
     </section>
 
