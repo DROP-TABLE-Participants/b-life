@@ -2,31 +2,33 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader, TransferRow } from "@/components/dashboard/DashboardParts";
 import { PRIORITY_LABELS, RECOMMENDATION_STATUS_LABELS } from "@/lib/labels";
-import { cn, formatHospitalLabel, formatMinutes } from "@/lib/utils";
+import { formatMinutes } from "@/lib/utils";
 import type { Hospital, TransferRecommendation } from "@/types/domain";
-import surfaceStyles from "./DashboardCardSurface.module.css";
 
 export function RecommendationsPanel({ hospitals, recommendations, facility, onApprove, onDispatch }: {
   hospitals: Hospital[]; recommendations: TransferRecommendation[]; facility?: Hospital; onApprove?: (id: string) => void; onDispatch?: (id: string) => void;
 }) {
   const active = recommendations.filter((item) => item.status !== "fulfilled" && item.status !== "cancelled");
-  return <Card className={cn(surfaceStyles.dashboardCardSurface, "overflow-hidden")}>
-    <CardHeader className="p-4 pb-0"><CardTitle>Препоръчани прехвърляния</CardTitle></CardHeader>
-    <CardContent className="space-y-3 p-4">
-      {facility?.kind === "hospital" && <p className="text-sm text-muted-foreground">Препоръки за Вашата болница. Прехвърлянията се одобряват от изпращащия център.</p>}
-      {active.length === 0 && <p className="text-sm text-muted-foreground">В момента няма препоръчани прехвърляния.</p>}
-      {active.map((item) => <article key={item.id} className="space-y-2 rounded-2xl border border-slate-200 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">{item.bloodType} · {item.suggestedQuantity} ед.</p><Badge variant="outline">{PRIORITY_LABELS[item.urgency]}</Badge></div>
-        <p className="text-sm">От {formatHospitalLabel(hospitals.find((hospital) => hospital.id === item.fromHospitalId))} до {formatHospitalLabel(hospitals.find((hospital) => hospital.id === item.toHospitalId))}</p>
-        <p className="text-sm text-muted-foreground">{item.reason}</p>
-        <p className="text-sm text-muted-foreground">{RECOMMENDATION_STATUS_LABELS[item.status]} · Очаквано пристигане {formatMinutes(item.etaMinutes)} · Надеждност {item.confidenceScore}%</p>
-        {facility && facility.kind !== "hospital" && item.fromHospitalId === facility.id && <div className="flex gap-2">
-          {onApprove && item.status === "pending_approval" && <Button type="button" size="sm" onClick={() => onApprove(item.id)}>Одобряване</Button>}
-          {onDispatch && item.status === "approved" && <Button type="button" size="sm" variant="outline" onClick={() => onDispatch(item.id)}>Изпращане</Button>}
-        </div>}
-      </article>)}
-    </CardContent>
-  </Card>;
+  const name = (id: string) => hospitals.find((hospital) => hospital.id === id)?.name ?? "Непознат обект";
+  return <div className="flex flex-col gap-6">
+    {facility && <PageHeader title="Препоръки" subtitle={facility.kind === "hospital" ? "Препоръки за Вашата болница. Прехвърлянията се одобряват от изпращащия център." : `Препоръчани прехвърляния за ${facility.name}`} />}
+    <section className="overflow-hidden rounded-2xl border border-hairline bg-white shadow-glass-card">
+      {active.length === 0 && <p className="px-4 py-6 text-sm text-ink-muted">В момента няма препоръчани прехвърляния.</p>}
+      <div className="divide-y divide-hairline">{active.map((item) => {
+        const own = facility && facility.kind !== "hospital" && item.fromHospitalId === facility.id;
+        return <div key={item.id}>
+          <TransferRow kind="recommendation" bloodType={item.bloodType} title={`${item.suggestedQuantity} ед. · ${name(item.fromHospitalId)} → ${name(item.toHospitalId)}`}
+            meta={`${RECOMMENDATION_STATUS_LABELS[item.status]} · ~${formatMinutes(item.etaMinutes)} път · ${Math.round(item.distanceKm)} км · надеждност ${item.confidenceScore}%`}
+            badge={item.urgency === "critical" ? <Badge variant="critical" dot>{PRIORITY_LABELS[item.urgency]}</Badge> : <Badge>{PRIORITY_LABELS[item.urgency]}</Badge>}
+            actions={own ? <>
+              {onApprove && item.status === "pending_approval" && <Button size="sm" variant="secondary" onClick={() => onApprove(item.id)}>Одобряване</Button>}
+              {onDispatch && item.status === "approved" && <Button size="sm" variant="secondary" onClick={() => onDispatch(item.id)}>Изпращане</Button>}
+            </> : undefined} />
+          <p className="-mt-2 px-4 pb-3.5 pl-[124px] text-xs text-ink-secondary">{item.reason}</p>
+        </div>;
+      })}</div>
+    </section>
+  </div>;
 }

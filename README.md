@@ -45,11 +45,12 @@ All state lives in this browser's localStorage under `b-life:app-state`; there i
 Version 2 automatically replaces the previous demo data on first load. Reset controls are not exposed in the interface.
 The account switcher is a demo role selector, not production authentication. Tabs in the same browser share network data while keeping their own selected accounts; separate browsers do not share state.
 
-Plan a shipment to reserve units, then dispatch it from **Моите активни пратки**, or choose **Изпращане сега**.
+Plan a shipment to reserve units, then dispatch it from **Трансфери**, or choose **Изпращане сега** in the send sheet. Recipients are ranked by how soon they run short, and the arrival time comes from the Mapbox route (with a distance estimate as fallback).
 Only the sender can dispatch; only the recipient can mark an in-transit shipment received.
 Inventory is deducted on dispatch and credited once on receipt. Simulated arrival waits for receipt confirmation.
-Each facility has separate **Наличности**, **Прогнози**, **Заявки**, **Пратки**, **Препоръки**, and **Карта** pages in the sidebar.
-The Ministry also has an **Общ преглед** page; all of its pages remain read-only.
+Each facility has **Общ преглед** (inventory cards plus action, transit and 48-hour widgets), **Прогнози**, **Трансфери** (requests, recommendations and shipments in one queue), **Препоръки**, and **Карта** pages in the sidebar.
+The Ministry also has **Наличности** and a network **Общ преглед** (risk matrix and time to first shortage); all of its pages remain read-only. The old `/orders` and `/shipments` URLs redirect to `/transfers`.
+The visual language (glass surfaces, status and brand tokens) lives in `app/globals.css`; inventory cards use a WebGL mesh gradient that follows the cursor and scales with risk.
 Dropdowns use the shared Radix UI select components, with consistent orange focus/selection accents and keyboard navigation. Form fields use `components/ui/FieldSelect.tsx`; the base corner radius is controlled by `--radius` in `app/globals.css`.
 Account switching preserves the current section. Shared layouts keep the selected account, sidebar, storage synchronization, and shipment simulation active across navigation.
 
@@ -65,9 +66,9 @@ Only current shipments appear on the map, with selectable origin/destination rou
 Facility accounts see their own routes; the Ministry sees the entire network, using the same map without a heatmap.
 The country boundary is [Natural Earth 1:50m admin-0 data](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson), public domain, stored locally in `lib/geo/bulgaria.json`.
 
-To request blood, choose **Заявка за кръв**, a blood type, and a positive whole quantity.
+To request blood, choose **Заявка за кръв**. The sheet is pre-filled from the forecast (blood type, shortfall quantity and priority) and ranks suppliers, marking those with a matching recommendation.
 Only other facilities with enough unreserved stock appear as suppliers.
-The supplier sees the request under **Моите заявки за кръв** and may accept or decline; the requester may cancel a pending request.
+The supplier sees the request under **Входящи заявки** in **Трансфери**, with a stock check that warns when accepting would leave it below its own 48-hour need, and may accept or decline; the requester may cancel a pending request.
 Acceptance rechecks stock and creates one approved shipment, reserving the quantity until dispatch.
 The normal dispatch and receipt flow completes the order. The Ministry can monitor orders without taking action.
 Existing saved accounts gain an empty order list without losing inventory or shipments.

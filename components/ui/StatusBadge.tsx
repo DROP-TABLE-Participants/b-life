@@ -1,25 +1,22 @@
 import { RISK_LABELS, SHIPMENT_STATUS_LABELS } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
-import { STATUS_COLORS } from "@/lib/constants";
 import type { RiskLevel, ShipmentStatus } from "@/types/domain";
 
 interface StatusBadgeProps {
   status: ShipmentStatus | RiskLevel;
+  className?: string;
 }
 
-const riskClass: Record<RiskLevel, string> = {
-  safe: "bg-emerald-100 text-emerald-700",
-  elevated: "bg-amber-100 text-amber-700",
-  high: "bg-orange-100 text-orange-700",
-  critical: "bg-rose-100 text-rose-700",
+// Only exceptions carry colour: normal states stay neutral.
+const shipmentVariant: Record<ShipmentStatus, "default" | "elevated" | "critical"> = {
+  planned: "default", approved: "default", in_transit: "default", delivered: "default",
+  delayed: "elevated", cancelled: "default",
 };
 
-export function StatusBadge({ status }: StatusBadgeProps) {
-  const classes = status in STATUS_COLORS ? STATUS_COLORS[status as ShipmentStatus] : riskClass[status as RiskLevel];
-
-  return (
-    <Badge className={classes}>
-      {status in SHIPMENT_STATUS_LABELS ? SHIPMENT_STATUS_LABELS[status as ShipmentStatus] : RISK_LABELS[status as RiskLevel]}
-    </Badge>
-  );
+export function StatusBadge({ status, className }: StatusBadgeProps) {
+  if (status in SHIPMENT_STATUS_LABELS) {
+    const variant = shipmentVariant[status as ShipmentStatus];
+    return <Badge variant={variant} dot={variant !== "default"} className={className}>{SHIPMENT_STATUS_LABELS[status as ShipmentStatus]}</Badge>;
+  }
+  return <Badge variant={status as RiskLevel} dot className={className}>{RISK_LABELS[status as RiskLevel]}</Badge>;
 }

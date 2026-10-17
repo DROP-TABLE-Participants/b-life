@@ -8,5 +8,5 @@ export function AdminDashboardPage({ section }: { section: AdminSection }) {
   const state = useAppStore();
   if (!state.initialized) return null;
   return <ControlTowerDashboardView key={section} section={section} hospitals={state.hospitals} forecasts={state.forecasts}
-    shipments={state.shipments} orders={state.orders} recommendations={state.recommendations} kpis={state.kpis} />;
+    shipments={state.shipments} orders={state.orders} recommendations={state.recommendations} kpis={state.kpis} session={state.session} />;
 }

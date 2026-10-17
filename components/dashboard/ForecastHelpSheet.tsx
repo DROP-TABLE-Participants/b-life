@@ -13,7 +13,7 @@ const steps = [
 
 export function ForecastHelpSheet() {
   return <Sheet>
-    <SheetTrigger type="button" className={styles.helpTrigger} aria-label="Разчитане на прогнозата" title="Разчитане на прогнозата"><CircleHelp size={25} strokeWidth={1.8} aria-hidden="true" /></SheetTrigger>
+    <SheetTrigger type="button" className={styles.helpTrigger} aria-label="Разчитане на прогнозата" title="Разчитане на прогнозата"><CircleHelp size={20} strokeWidth={2} aria-hidden="true" /></SheetTrigger>
     <SheetContent side="right" className="overflow-y-auto bg-white p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[480px] data-[side=right]:data-starting-style:translate-x-full data-[side=right]:data-ending-style:translate-x-full motion-reduce:transition-none">
       <SheetHeader className="gap-3 border-b border-slate-100 p-7 pr-12">
         <SheetTitle className="text-lg font-semibold text-slate-900">Разчитане на прогнозата</SheetTitle>

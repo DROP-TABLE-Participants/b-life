@@ -1,5 +1,5 @@
 import { FacilityDashboardPage } from "@/components/dashboard/FacilityDashboardPage";
 
 export default function Page() {
-  return <FacilityDashboardPage section="inventory" />;
+  return <FacilityDashboardPage section="overview" />;
 }
