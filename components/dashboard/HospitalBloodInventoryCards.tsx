@@ -11,10 +11,10 @@ import styles from "./HospitalBloodInventoryCards.module.css";
 
 // Colour and intensity both scale with risk: safe stays faint, critical is strongest.
 export const RISK_MESH: Record<RiskLevel, { colors: [string, string, string]; intensity: number }> = {
-  safe: { colors: ["#34d399", "#5eead4", "#a7f3d0"], intensity: 0.47 },
-  elevated: { colors: ["#fbbf24", "#fde047", "#fed7aa"], intensity: 0.6 },
-  high: { colors: ["#fb923c", "#fdba74", "#fca5a5"], intensity: 0.68 },
-  critical: { colors: ["#f43f5e", "#fb7185", "#fb923c"], intensity: 0.81 },
+  safe: { colors: ["#6ee7b7", "#99f6e4", "#d1fae5"], intensity: 0.3 },
+  elevated: { colors: ["#fcd34d", "#fef08a", "#fde7c7"], intensity: 0.36 },
+  high: { colors: ["#fdba74", "#fed7aa", "#fecaca"], intensity: 0.42 },
+  critical: { colors: ["#fb7185", "#fda4af", "#fdba74"], intensity: 0.5 },
 };
 
 interface BloodGroupCardProps {

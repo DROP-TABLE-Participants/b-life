@@ -29,6 +29,7 @@ uniform vec3 uColorB;
 uniform vec3 uColorC;
 uniform float uIntensity;
 uniform float uSeed;
+uniform float uHover;
 
 float aura(vec2 point, vec2 center, float radius) {
   vec2 delta = point - center;
@@ -56,7 +57,14 @@ void main() {
   vec2 drift = vec2(cos(uSeed), sin(uSeed * 1.3));
   vec2 warp = vec2(noise(uv * 2.6 + drift * t + uSeed), noise(uv * 2.6 - drift.yx * t + uSeed * 2.1)) - 0.5;
   warp += (vec2(noise(uv * 5.2 + t * 0.7), noise(uv * 5.2 - t * 0.6 + 3.7)) - 0.5) * 0.5;
-  uv += warp * 0.12;
+  uv += warp * (0.12 + uHover * 0.22);
+
+  // On hover a local swirl follows the pointer, like stirring a liquid.
+  vec2 toPointer = (uv - uPointer) * vec2(aspect, 1.0);
+  float near = exp(-dot(toPointer, toPointer) / 0.09);
+  vec2 swirl = vec2(-toPointer.y, toPointer.x) / aspect;
+  uv += swirl * near * uHover * (0.55 + 0.25 * sin(t * 2.0 + uSeed));
+  uv += (vec2(noise(uv * 7.0 + t * 1.3), noise(uv * 7.0 - t * 1.1 + 5.3)) - 0.5) * near * uHover * 0.12;
 
   vec2 point = vec2(uv.x * aspect, uv.y);
   vec2 pull = (uPointer - 0.5) * vec2(0.22 * aspect, 0.16);
@@ -73,11 +81,14 @@ void main() {
 
   float weight = a + b + c + 0.0001;
   vec3 color = (uColorA * a + uColorB * b + uColorC * c) / weight;
+  // Muted, pearly tones: pull the palette toward white so the card stays calm.
+  color = mix(color, vec3(1.0), 0.3);
   color = mix(color, vec3(1.0), highlight * 0.5);
 
-  float alpha = clamp(max(a, max(b, c)) * 1.2, 0.0, 1.0);
-  alpha *= 1.0 - smoothstep(0.18, 0.78, uv.y);
-  alpha *= uIntensity;
+  float alpha = clamp(max(a, max(b, c)) * 1.1, 0.0, 1.0);
+  alpha *= 1.0 - smoothstep(0.1, 0.62, uv.y);
+  // Hover lifts the aura a little so the stirring is visible; at rest it stays quiet.
+  alpha *= uIntensity * (1.0 + uHover * 0.3);
   gl_FragColor = vec4(color * alpha, alpha);
 }
 `;
@@ -141,10 +152,12 @@ export function MeshGradientBackground({ seed, colors, intensity }: MeshGradient
     const resolutionLocation = uniform("uResolution");
     const timeLocation = uniform("uTime");
     const pointerLocation = uniform("uPointer");
+    const hoverLocation = uniform("uHover");
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const target = { x: 0.5, y: 0.5 };
     const pointer = { x: 0.5, y: 0.5 };
+    const hover = { target: 0, value: 0 };
     let frame = 0;
     let visible = true;
     const startedAt = performance.now();
@@ -160,6 +173,8 @@ export function MeshGradientBackground({ seed, colors, intensity }: MeshGradient
     const draw = () => {
       pointer.x += (target.x - pointer.x) * 0.08;
       pointer.y += (target.y - pointer.y) * 0.08;
+      hover.value += (hover.target - hover.value) * 0.06;
+      gl.uniform1f(hoverLocation, reducedMotion ? 0 : hover.value);
       gl.uniform1f(timeLocation, reducedMotion ? 0 : (performance.now() - startedAt) / 1000);
       gl.uniform2f(pointerLocation, pointer.x, pointer.y);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -177,11 +192,13 @@ export function MeshGradientBackground({ seed, colors, intensity }: MeshGradient
       const bounds = host.getBoundingClientRect();
       target.x = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
       target.y = Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height));
+      hover.target = 1;
       if (reducedMotion) draw();
     };
     const onPointerLeave = () => {
       target.x = 0.5;
       target.y = 0.5;
+      hover.target = 0;
     };
 
     const resizeObserver = new ResizeObserver(() => {
