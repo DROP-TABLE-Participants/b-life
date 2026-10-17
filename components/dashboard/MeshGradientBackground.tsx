@@ -50,13 +50,13 @@ void main() {
   vec2 uv = gl_FragCoord.xy / uResolution;
   uv.y = 1.0 - uv.y;
   float aspect = uResolution.x / uResolution.y;
-  float t = uTime * (0.32 + fract(uSeed * 0.37) * 0.12);
+  float t = uTime * (0.45 + fract(uSeed * 0.37) * 0.2);
 
   // Slight organic distortion: two noise octaves drifting in seed-dependent directions.
   vec2 drift = vec2(cos(uSeed), sin(uSeed * 1.3));
   vec2 warp = vec2(noise(uv * 2.6 + drift * t + uSeed), noise(uv * 2.6 - drift.yx * t + uSeed * 2.1)) - 0.5;
   warp += (vec2(noise(uv * 5.2 + t * 0.7), noise(uv * 5.2 - t * 0.6 + 3.7)) - 0.5) * 0.5;
-  uv += warp * 0.09;
+  uv += warp * 0.12;
 
   vec2 point = vec2(uv.x * aspect, uv.y);
   vec2 pull = (uPointer - 0.5) * vec2(0.22 * aspect, 0.16);
@@ -107,7 +107,7 @@ export function MeshGradientBackground({ seed, colors, intensity }: MeshGradient
     const canvas = canvasRef.current;
     const host = canvas?.parentElement;
     const gl = canvas?.getContext("webgl", { premultipliedAlpha: true, antialias: false });
-    if (!canvas || !host || !gl) {
+    if (!canvas || !host || !gl || gl.isContextLost()) {
       setFallback(true);
       return;
     }
@@ -216,7 +216,6 @@ export function MeshGradientBackground({ seed, colors, intensity }: MeshGradient
       gl.deleteShader(vertex);
       gl.deleteShader(fragment);
       gl.deleteBuffer(buffer);
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
   }, [seed, colorKey, intensity]);
 
@@ -227,6 +226,7 @@ export function MeshGradientBackground({ seed, colors, intensity }: MeshGradient
     }} />;
   }
 
-  // A fresh canvas per configuration: the previous context is released on cleanup.
+  // A fresh canvas per configuration. The context itself is not force-released on cleanup:
+  // React Strict Mode re-runs effects on the same canvas, which would then get a lost context.
   return <canvas key={`${seed}:${colorKey}:${intensity}`} ref={canvasRef} aria-hidden="true" className={styles.meshCanvas} />;
 }

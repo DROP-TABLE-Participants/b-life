@@ -70,6 +70,7 @@ const positionOnRoute = (points: [number, number][], progress: number): [number,
 };
 
 const glass = "rounded-2xl border border-glass-border bg-glass-strong shadow-popover backdrop-blur-xl";
+const rowHover = "rounded-xl border border-transparent text-left transition-[background-color,border-color,box-shadow] duration-150 outline-none hover:border-hairline hover:bg-white hover:shadow-control focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendations, workspaceBase, highlightedHospitalId, mapboxToken }: ShipmentMapCanvasProps) {
   const mapRef = useRef<MapRef | null>(null);
@@ -81,6 +82,7 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
   const [mapError, setMapError] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [listHoverId, setListHoverId] = useState<string | null>(null);
   const [hover, setHover] = useState<{ ids: string[]; x: number; y: number; width: number; height: number } | null>(null);
   const hospitalById = new Map(hospitals.map((facility) => [facility.id, facility]));
   const activeShipments = shipments.filter((item) => item.status !== "delivered" && item.status !== "cancelled" &&
@@ -146,9 +148,11 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
     setHover(ids.length ? { ids, x: event.point.x, y: event.point.y, width: container.clientWidth, height: container.clientHeight } : null);
   };
   // The hovered route stays fully drawn and thicker; the others step back.
-  const hoveredId = hover?.ids[0] ?? "";
-  const emphasis = (opacity: number): LineOpacity => hover
-    ? ["case", ["in", ["get", "shipmentId"], ["literal", hover.ids]], opacity, opacity * 0.3]
+  // Hovering a route on the map or a row in the panel highlights the same route.
+  const highlighted = hover?.ids ?? (listHoverId ? [listHoverId] : []);
+  const hoveredId = highlighted[0] ?? "";
+  const emphasis = (opacity: number): LineOpacity => highlighted.length
+    ? ["case", ["in", ["get", "shipmentId"], ["literal", highlighted]], opacity, opacity * 0.3]
     : opacity;
   const hoveredRouteLayer: LayerProps = {
     id: "hovered-shipment-route", type: "line", filter: ["==", ["get", "shipmentId"], hoveredId], layout: { "line-cap": "round", "line-join": "round" },
@@ -192,7 +196,7 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
           const color = shipment.status === "delayed" ? DELAYED : BRAND;
           return <Marker key={shipment.id} longitude={longitude} latitude={latitude}>
             <button type="button" aria-label={`Проследяване: ${shipment.bloodType}, ${shipment.quantity} единици`}
-              className={cn("flex size-8 items-center justify-center rounded-full border-2 bg-white shadow-popover transition-transform", hover?.ids.includes(shipment.id) && "scale-115")} style={{ borderColor: color, color }}
+              className={cn("flex size-8 items-center justify-center rounded-full border-2 bg-white shadow-popover transition-transform", highlighted.includes(shipment.id) && "scale-115")} style={{ borderColor: color, color }}
               onMouseEnter={() => { const point = mapRef.current?.project([longitude, latitude]); const container = mapRef.current?.getContainer(); if (point && container) setHover({ ids: [shipment.id], x: point.x, y: point.y, width: container.clientWidth, height: container.clientHeight }); }}
               onMouseLeave={() => setHover(null)}
               onClick={(event) => { event.stopPropagation(); chooseShipment(shipment.id); }}><Truck size={15} /></button>
@@ -224,7 +228,7 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
         {hospitals.map((facility) => {
           const short = shortagesByFacility.get(facility.id) ?? [];
           return <button key={facility.id} type="button" onClick={() => chooseHospital(facility.id)}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white">
+            className={cn(rowHover, "flex w-full items-center gap-3 px-3 py-2.5")}>
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-white text-white shadow-control" style={{ backgroundColor: FACILITY_COLORS[facility.kind] }}><FacilityIcon facility={facility} size={15} /></span>
             <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-ink">{facility.name}</span><span className="block text-xs text-ink-secondary">{FACILITY_ROLE_LABELS[facility.kind]} · {facility.city}</span></span>
             <span className={cn("text-xs", short.length >= 3 ? "text-critical" : short.length ? "text-elevated" : "text-ink-muted")}>{short.length ? `${short.length} ${short.length === 1 ? "група" : "групи"}` : "Без недостиг"}</span>
@@ -233,9 +237,15 @@ export function ShipmentMapCanvas({ hospitals, shipments, forecasts, recommendat
         <div className="my-2 border-t border-hairline" />
         <p className="flex gap-1.5 px-3 pb-1.5 text-xs font-medium text-ink-secondary">Активни пратки<span className="font-normal text-ink-muted">{activeShipments.length}</span></p>
         {activeShipments.length === 0 && <p className="px-3 pb-2 text-xs text-ink-muted">Няма активни пратки.</p>}
-        {activeShipments.map((item) => <button key={item.id} type="button" onClick={() => chooseShipment(item.id)} className="w-full rounded-xl px-3 py-2 text-left hover:bg-white">
-          <span className="flex justify-between gap-3 text-xs"><span className="font-medium text-ink">{item.bloodType} · {item.quantity} ед. {name(item.fromHospitalId)} → {name(item.toHospitalId)}</span>
-            <span className={item.status === "delayed" ? "text-elevated" : "text-ink-secondary"}>{!moving(item) ? "очаква изпращане" : item.progress >= 1 ? "пристигна" : `~${formatMinutes(item.etaMinutes)}`}</span></span>
+        {activeShipments.map((item) => <button key={item.id} type="button" onClick={() => chooseShipment(item.id)}
+          onMouseEnter={() => setListHoverId(item.id)} onMouseLeave={() => setListHoverId(null)} onFocus={() => setListHoverId(item.id)} onBlur={() => setListHoverId(null)}
+          className={cn(rowHover, "w-full space-y-0.5 px-3 py-2", listHoverId === item.id && "border-hairline bg-white shadow-control")}>
+          <span className="flex items-center justify-between gap-3">
+            <span className="text-xs font-medium text-ink">{item.bloodType} · {item.quantity} ед.</span>
+            <StatusBadge status={item.status} />
+          </span>
+          <span className="block truncate text-xs text-ink-secondary">{name(item.fromHospitalId)} → {name(item.toHospitalId)}
+            {moving(item) && ` · ${item.progress >= 1 ? "пристигна" : `~${formatMinutes(item.etaMinutes)}`}`}</span>
         </button>)}
       </div>}
     </div>
