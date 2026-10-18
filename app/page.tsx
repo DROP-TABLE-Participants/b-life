@@ -92,6 +92,12 @@ export default function LandingPage() {
                 {MINISTRY_NAME} · Вход за администратор
               </Button>
             </div>
+            <section aria-labelledby="contact-heading" className="space-y-1 border-t border-slate-200 pt-4 text-center">
+              <h2 id="contact-heading" className="text-sm font-medium text-slate-600">Свържете се с нас</h2>
+              <a href="mailto:contact@dressr.fashion" className="inline-block rounded-sm text-sm text-[#e85a39] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e85a39]">
+                contact@dressr.fashion
+              </a>
+            </section>
           </CardContent>
         </Card>
       </main>
